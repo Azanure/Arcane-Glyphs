@@ -43,6 +43,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     const engine = new BABYLON.Engine(renderCanvas, true);
     const scene = new BABYLON.Scene(engine);
 
+    // --- CHARGEMENT DES ASSETS ---
+    window.enemyTemplates = {};
+    async function loadAssets() {
+        try {
+            // 1. Modèle Course
+            const resRun = await BABYLON.SceneLoader.ImportMeshAsync("", "assets/Animations/", "Slow Run.glb", scene);
+            resRun.meshes[0].setEnabled(false);
+            window.enemyTemplates['fire_run'] = { mesh: resRun.meshes[0], animationGroups: resRun.animationGroups };
+            
+            // 2. Modèle Attaque
+            const resAtk = await BABYLON.SceneLoader.ImportMeshAsync("", "assets/Animations/", "Attack.glb", scene);
+            resAtk.meshes[0].setEnabled(false);
+            window.enemyTemplates['fire_attack'] = { mesh: resAtk.meshes[0], animationGroups: resAtk.animationGroups };
+
+            // Nettoyage Root Motion sur les deux (In-Place)
+            [window.enemyTemplates['fire_run'], window.enemyTemplates['fire_attack']].forEach(template => {
+                template.animationGroups.forEach(ag => {
+                    ag.targetedAnimations.forEach(ta => {
+                        if (ta.animation.targetProperty === "position") {
+                            const keys = ta.animation.getKeys();
+                            keys.forEach(k => { k.value.x = 0; k.value.z = 0; });
+                        }
+                    });
+                });
+            });
+
+            console.log("[ASSETS] Modèles de course et d'attaque chargés avec succès.");
+        } catch (e) {
+            console.error("[ASSETS] Erreur lors du chargement des animations", e);
+        }
+    }
+    await loadAssets();
+
     // Initialisation des systèmes de Gameplay
     const environment = new Environment(scene);
     const player = new Player(scene);

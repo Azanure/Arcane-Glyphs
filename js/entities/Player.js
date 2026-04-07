@@ -19,6 +19,23 @@ export class Player {
         this.mesh = BABYLON.MeshBuilder.CreateCapsule("player", {height: 2, radius: 0.5}, this.scene);
         this.mesh.position.y = 1; 
 
+        const mat = new BABYLON.StandardMaterial("playerMat", scene);
+        mat.diffuseColor = new BABYLON.Color3(0, 0.7, 1);
+        this.mesh.material = mat;
+        
+        // --- HITBOX JOUEUR ---
+        this.hitbox = BABYLON.MeshBuilder.CreateBox("playerHitbox", {size: 1.5}, scene);
+        this.hitbox.parent = this.mesh;
+        this.hitbox.position.y = 1; // Centré sur le corps
+        this.hitbox.isPickable = false;
+        
+        // Style Debug Hitbox (Semi-transparent)
+        const hitboxMat = new BABYLON.StandardMaterial("hitboxMat", scene);
+        hitboxMat.diffuseColor = new BABYLON.Color3(0, 1, 0);
+        hitboxMat.alpha = 0.2; // Très discret
+        this.hitbox.material = hitboxMat;
+ 
+
         // Tir automatique
         this.shootCooldown = 1000; // time in ms between shots
         this.baseShootCooldown = 1000;

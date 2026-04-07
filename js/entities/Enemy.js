@@ -1,25 +1,45 @@
 export class Enemy {
-    constructor(scene, playerPos, radius, color = new BABYLON.Color3(1, 0, 0)) {
+    constructor(scene, playerPos, radius, color = new BABYLON.Color3(1, 0, 0), customMesh = null) {
         this.scene = scene;
         this.hp = 100;
-        this.speed = 0.035; // Vitesse divisée par 2 (était 0.07)
+        this.speed = 0.035; // Vitesse
         this.damage = 10;
         this.experienceValue = 5;
         this.lastDamageTime = 0;
-        this.damageCooldown = 1000; // 1s cooldown for dealing damage
+        this.damageCooldown = 1500; // Un peu plus long car lié à l'animation
+        this.attackRange = 1.8; // Distance pour lancer l'attaque
+        this.isAttacking = false;
+        this.animationGroups = [];
+
+        if (customMesh) {
+            this.mesh = customMesh;
+        } else {
+            this.mesh = BABYLON.MeshBuilder.CreateCapsule("enemy", {height: 2, radius: 0.5}, scene);
+            const mat = new BABYLON.StandardMaterial("enemyMat", scene);
+            mat.diffuseColor = color;
+            this.mesh.material = mat;
+        }
         
-        this.mesh = BABYLON.MeshBuilder.CreateCapsule("enemy", {height: 2, radius: 0.5}, scene);
-        const mat = new BABYLON.StandardMaterial("enemyMat", scene);
-        mat.diffuseColor = color;
-        this.mesh.material = mat;
-        
+        // --- HITBOX ENNEMI ---
+        this.hitbox = BABYLON.MeshBuilder.CreateBox("enemyHitbox", {size: 1.2}, scene);
+        this.hitbox.parent = this.mesh;
+        this.hitbox.position.y = 1;
+        this.hitbox.isPickable = false;
+        const hbMat = new BABYLON.StandardMaterial("hbMat", scene);
+        hbMat.diffuseColor = new BABYLON.Color3(1, 0, 0);
+        hbMat.alpha = 0.2;
+        this.hitbox.material = hbMat;
+
         const angle = Math.random() * Math.PI * 2;
         this.mesh.position.x = playerPos.x + Math.cos(angle) * radius;
         this.mesh.position.z = playerPos.z + Math.sin(angle) * radius;
-        this.mesh.position.y = 1;
+        this.mesh.position.y = customMesh ? 0 : 1; 
+        
+        // Orientation initiale
+        this.mesh.lookAt(new BABYLON.Vector3(playerPos.x, this.mesh.position.y, playerPos.z));
+        
         this.isDead = false;
         this.deathPosition = null;
-        
         this.freezeEndTime = 0;
         this.slowEndTime = 0;
     }
@@ -37,7 +57,6 @@ export class Enemy {
     heal(amount) {
         this.hp += amount;
         this.showFloatingText("+" + amount, "#44ff44");
-        // Optionally cap at max hp if you prefer, but requirement just says this.hp += amount
     }
 
     update(player, enemies) {
@@ -45,19 +64,17 @@ export class Enemy {
 
         let currentTime = window.gameTime;
         
-        if (currentTime < this.freezeEndTime) {
-            return; // Cannot move or attack while frozen
-        }
+        if (currentTime < this.freezeEndTime) return;
 
         const distance = BABYLON.Vector3.Distance(this.mesh.position, player.mesh.position);
         
-        // Collision detection for damaging the player
-        if (distance < 1.0 || this.mesh.intersectsMesh(player.mesh, false)) {
-            if (currentTime - this.lastDamageTime >= this.damageCooldown) {
-                player.takeDamage(this.damage);
-                this.lastDamageTime = currentTime;
-            }
+        // -- LOGIQUE D'ATTAQUE --
+        if (distance < this.attackRange && !this.isAttacking) {
+            this.startAttack(player);
         }
+
+        // Si on attaque, on ne bouge pas
+        if (this.isAttacking) return;
 
         // Separation force
         let separation = new BABYLON.Vector3(0, 0, 0);
@@ -81,14 +98,22 @@ export class Enemy {
             
             let currentSpeed = this.speed;
             if (currentTime < this.slowEndTime) {
-                currentSpeed *= 0.5; // slow down by half
+                currentSpeed *= 0.5;
             }
 
             let moveVec = direction.scale(currentSpeed);
             moveVec.addInPlace(separation);
             
             this.mesh.position.addInPlace(moveVec);
+            
+            this.mesh.lookAt(new BABYLON.Vector3(player.mesh.position.x, this.mesh.position.y, player.mesh.position.z));
         }
+    }
+
+    startAttack(player) {
+         // Sera surchargé par les classes dérivées pour gérer les animations GLB
+         this.isAttacking = true;
+         console.log("Enemy start attack");
     }
     
     takeDamage(amount) {

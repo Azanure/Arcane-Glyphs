@@ -23,8 +23,12 @@ export class Projectile {
             return;
         }
         
-        const direction = this.target.mesh.position.subtract(this.mesh.position);
+        const targetPos = this.target.mesh.position.clone();
+        targetPos.y = 1; // On vise le torse de l'ennemi au lieu de ses pieds
         
+        const direction = targetPos.subtract(this.mesh.position);
+        
+        // On vérifie la distance. On peut aussi ignorer Y pour plus de permissivité
         if (direction.length() < this.speed) {
             this.target.takeDamage(this.damage);
             this.destroy();
