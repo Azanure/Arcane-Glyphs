@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Roguelike</title>
+    <style>
+        /* Pour que le jeu prenne tout l'écran sans marges */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #renderCanvas { width: 100%; height: 100%; touch-action: none; outline: none; }
+        
+        #uiContainer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            font-family: Arial, sans-serif;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            z-index: 10;
+        }
+        .bar-container {
+            width: 300px;
+            height: 25px;
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #333;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .bar-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.2s ease-out;
+        }
+        #hpBar { background-color: #ff3333; }
+        #xpBar { background-color: #33cc33; }
+        .bar-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        #aiDirectorUI {
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border: 1px solid #ffcc00;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #spellSelectionScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            font-family: Arial, sans-serif;
+        }
+        #spellSelectionScreen h1 {
+            color: #ffcc00;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 5px #000;
+        }
+        #spellBank {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            min-height: 80px;
+            align-items: center;
+        }
+        .spell-item {
+            width: 60px;
+            height: 60px;
+            background-color: #444;
+            border: 2px solid #888;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            cursor: grab;
+            user-select: none;
+            text-align: center;
+            font-size: 12px;
+            padding: 5px;
+            box-sizing: border-box;
+            word-wrap: break-word;
+        }
+        .spell-item:active {
+            cursor: grabbing;
+        }
+        #dropZones {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .drop-slot {
+            width: 80px;
+            height: 80px;
+            border: 2px dashed #aaa;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .drop-slot::before {
+            content: attr(data-key);
+            position: absolute;
+            top: -25px;
+            color: #aaa;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        #startGameBtn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background-color: #33cc33;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+            display: none;
+        }
+        #startGameBtn:hover {
+            background-color: #28a428;
+            transform: scale(1.05);
+        }
+
+        #hudSpells {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+        .hud-slot {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #333;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            text-align: center;
+            overflow: hidden;
+        }
+        .hud-slot::after {
+            content: attr(data-key);
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            color: #ffcc00;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .hud-needle {
+            position: absolute;
+            width: 2px;
+            height: 40px;
+            background: yellow;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: rotate(0deg);
+            z-index: 5;
+            transition: transform 0.1s linear;
+        }
+
+        #levelUpScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 90;
+            font-family: Arial, sans-serif;
+        }
+        #levelUpScreen h2 {
+            color: #ffcc00;
+            font-size: 4rem;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 5px #000;
+        }
+        .upgrade-btn {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #3388cc;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            margin: 10px;
+            min-width: 300px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .upgrade-btn:hover:not(:disabled) {
+            background-color: #2877b4;
+            transform: scale(1.05);
+        }
+        .upgrade-btn:disabled {
+            background-color: #555;
+            color: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            font-family: Arial, sans-serif;
+        }
+        #gameOverScreen h1 {
+            color: #ff3333;
+            font-size: 5rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 8px #000;
+        }
+        #retryButton {
+            padding: 15px 40px;
+            font-size: 24px;
+            background-color: #33cc33;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+        #retryButton:hover {
+            background-color: #28a428;
+            transform: scale(1.05);
+        }
+        #retryButton:active {
+            transform: scale(0.95);
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+    <div id="uiContainer">
+        <div class="bar-container">
+            <div id="hpBar" class="bar-fill"></div>
+            <div id="hpText" class="bar-text">HP: 100/100</div>
+        </div>
+        <div class="bar-container">
+            <div id="xpBar" class="bar-fill" style="width: 0%;"></div>
+            <div id="xpText" class="bar-text">Level 1 - XP: 0/10</div>
+        </div>
+        <div id="aiDirectorUI">
+            <div><strong>AI Spawn Chances:</strong></div>
+            <div style="color: #ff4444;" id="probFire">Fire: 33%</div>
+            <div style="color: #44aaff;" id="probIce">Ice: 33%</div>
+            <div style="color: #55cc55;" id="probEarth">Earth: 33%</div>
+        </div>
+    </div>
+
+    <div id="spellSelectionScreen">
+        <h1>Select Your Spells</h1>
+        <div id="spellBank"></div>
+        <div id="dropZones">
+            <div class="drop-slot" id="slot-fire" data-key="Q"></div>
+            <div class="drop-slot" id="slot-ice" data-key="E"></div>
+            <div class="drop-slot" id="slot-earth" data-key="F"></div>
+        </div>
+        <button id="startGameBtn">PLAY</button>
+    </div>
+
+    <div id="hudSpells">
+        <div class="hud-slot" id="hud-q" data-key="Q">
+            <div class="hud-needle"></div>
+            <span class="hud-spell-name"></span>
+        </div>
+        <div class="hud-slot" id="hud-e" data-key="E">
+            <div class="hud-needle"></div>
+            <span class="hud-spell-name"></span>
+        </div>
+        <div class="hud-slot" id="hud-f" data-key="F">
+            <div class="hud-needle"></div>
+            <span class="hud-spell-name"></span>
+        </div>
+    </div>
+
+    <div id="levelUpScreen">
+        <h2>LEVEL UP!</h2>
+        <button id="btnUpgrade1" class="upgrade-btn"></button>
+        <button id="btnUpgrade2" class="upgrade-btn"></button>
+        <button id="btnUpgrade3" class="upgrade-btn"></button>
+    </div>
+
+    <!-- UI Overlay : Game Over -->
+    <div id="gameOverScreen">
+        <h1>GAME OVER</h1>
+        <!-- Recharge simplement la page pour recommencer le jeu -->
+        <button id="retryButton" onclick="location.reload()">Retry</button>
+    </div>
+
+    <canvas id="renderCanvas"></canvas>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>s
