@@ -1,0 +1,624 @@
+/* Reset et style global */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+    font-family: 'Press Start 2P', cursive;
+    user-select: none;
+    color: #fff;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Canvas Babylon.js pour le monde 3D en plein écran */
+#renderCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    z-index: 1;
+}
+
+/* Canvas 2D pour dessiner les tracés magiques par-dessus avec fond transparent */
+#drawingCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Passe les événements de clic au canvas 3D */
+    z-index: 10;
+}
+
+/* Retour vidéo de la webcam en bas à gauche */
+#videoElement {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 240px; /* Taille réduite pour ne pas trop couvrir le jeu */
+    height: 180px;
+    z-index: 20;
+    transform: scaleX(-1); /* Effet miroir naturel */
+    border: 2px solid rgba(0, 255, 255, 0.5);
+    border-radius: 12px;
+    object-fit: cover;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    /* Petit effet glassmorphism pour le style */
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+        /* Indicateur de statut du tracking (Haut Droite) */
+        #trackingStatus {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 1px;
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #trackingStatus .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff4444; /* Rouge par défaut */
+            box-shadow: 0 0 10px #ff4444;
+        }
+
+        #trackingStatus.waiting {
+            border-color: rgba(255, 165, 0, 0.4);
+            color: #ffa500;
+        }
+
+        #trackingStatus.waiting .dot {
+            background-color: #ffa500;
+            box-shadow: 0 0 10px #ffa500;
+        }
+
+        #trackingStatus.correct {
+            border-color: rgba(0, 255, 0, 0.4);
+            color: #00ff00;
+            background: rgba(0, 80, 0, 0.3);
+            transform: scale(1.05); /* Petit effet de zoom quand c'est validé */
+        }
+
+        #trackingStatus.correct .dot {
+            background-color: #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        /* L'élément HTML représentant le stylo imaginaire / curseur magique */
+        #magicCursor {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background-color: rgba(0, 255, 255, 0.8);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            z-index: 30;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px #00FFFF, 0 0 30px #00FFFF;
+            transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.3s;
+        }
+
+        /* État quand on perd la main */
+        #magicCursor.lost {
+            opacity: 0.3;
+            transform: translate(-50%, -50%) scale(0.5);
+            background-color: rgba(255, 255, 255, 0.2);
+            box-shadow: none;
+        }
+
+/* Style spécifique quand le joueur "pince" pour dessiner */
+#magicCursor.drawing {
+    background-color: rgba(255, 0, 255, 0.9);
+    border-color: #fff;
+    transform: translate(-50%, -50%) scale(0.7); /* Se rétrécit un peu pour imiter la pression */
+    box-shadow: 0 0 20px #FF00FF, 0 0 40px #FF00FF, 0 0 60px #FF00FF;
+}
+
+/* Container central supérieur pour les messages de sorts */
+#toastContainer {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Style d'un seul message (Toast) */
+.toast {
+    background: linear-gradient(135deg, rgba(20, 20, 40, 0.9), rgba(40, 20, 60, 0.9));
+    color: #fff;
+    padding: 15px 40px;
+    border-radius: 30px;
+    font-size: 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    border: 2px solid rgba(0, 255, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4), inset 0 0 15px rgba(255, 0, 255, 0.2);
+    animation: fadeInOut 2s ease-in-out forwards;
+}
+
+/* Animation d'apparition et de disparition fluide du Toast */
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-20px) scale(0.9); }
+    10% { opacity: 1; transform: translateY(0) scale(1.05); }
+    15% { transform: translateY(0) scale(1); }
+    80% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-20px) scale(0.9); }
+}
+
+/* ==========================================
+   SYSTÈME DE MENU ET OVERLAYS (VOXEL)
+   ========================================== */
+
+.overlay-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    transition: opacity 0.4s ease;
+}
+
+.hidden {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Conteneur de contenu du menu */
+.menu-content, .panel-content, .modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+/* Titre Pixel Art */
+.pixel-title {
+    font-size: 4rem;
+    color: #00f2ff;
+    text-shadow: 
+        4px 4px 0px #7b00ff,
+        8px 8px 0px #3a007a;
+    margin-bottom: 3rem;
+    letter-spacing: 4px;
+    animation: titleFloat 3s ease-in-out infinite;
+}
+
+.pixel-subtitle {
+    font-size: 1.5rem;
+    color: #7b00ff;
+    margin-bottom: 2rem;
+}
+
+@keyframes titleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* LISTE DE BOUTONS */
+.button-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* STYLE VOXEL DES BOUTONS */
+.voxel-btn {
+    background-color: #7b00ff;
+    color: #fff;
+    border: none;
+    padding: 15px 40px;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 
+        inset -4px -4px 0px 0px #3a007a,
+        4px 4px 0px 0px #000;
+    transition: all 0.1s;
+    outline: none;
+}
+
+.voxel-btn:hover:not(:disabled) {
+    background-color: #9d3dff;
+    transform: translate(-2px, -2px);
+    box-shadow: 
+        inset -4px -4px 0px 0px #3a007a,
+        6px 6px 0px 0px #000;
+}
+
+.voxel-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 
+        inset -4px -4px 0px 0px #3a007a,
+        2px 2px 0px 0px #000;
+}
+
+.voxel-btn:disabled {
+    background-color: #444;
+    color: #888;
+    cursor: not-allowed;
+    box-shadow: inset -4px -4px 0px 0px #222;
+    opacity: 0.6;
+}
+
+.voxel-btn.small {
+    padding: 10px 20px;
+    font-size: 0.7rem;
+}
+
+.voxel-btn.alert {
+    background-color: #ff3d3d;
+    box-shadow: inset -4px -4px 0px 0px #9e0000, 4px 4px 0px 0px #000;
+}
+
+/* BOITE VOXEL (PANNEAUX) */
+.voxel-box {
+    background-color: #1a1a2e;
+    border: 4px solid #7b00ff;
+    padding: 40px;
+    box-shadow: 8px 8px 0px #000;
+    min-width: 300px;
+    max-width: 80%;
+}
+
+/* ÉLÉMENTS DE RÉGLAGES */
+.setting-item {
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 15px;
+    font-size: 0.8rem;
+    color: #00f2ff;
+}
+
+/* SLIDERS PERSONNALISÉS */
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    background: transparent;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 12px;
+    background: #3a007a;
+    border: 2px solid #7b00ff;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 24px;
+    width: 12px;
+    background: #00f2ff;
+    cursor: pointer;
+    margin-top: -8px;
+    border: 2px solid #fff;
+    box-shadow: 2px 2px 0px #000;
+}
+
+/* TEXTE CREDITS */
+.credits-text {
+    line-height: 2;
+    font-size: 0.6rem;
+    margin-bottom: 2rem;
+}
+
+/* ==========================================
+   IN-GAME HUD (HP, XP, AI)
+   ========================================== */
+#uiContainer {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    pointer-events: none;
+    z-index: 10;
+}
+.bar-container {
+    width: 300px;
+    height: 25px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 4px solid #3a007a;
+    margin-bottom: 15px;
+    position: relative;
+    box-shadow: 4px 4px 0px #000;
+}
+.bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.2s ease-out;
+}
+#hpBar { background-color: #ff3333; }
+#xpBar { background-color: #33cc33; }
+.bar-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    text-shadow: 2px 2px 0px #000;
+}
+
+#aiDirectorUI {
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px;
+    border: 2px solid #ffcc00;
+    font-size: 0.6rem;
+    box-shadow: 4px 4px 0px #000;
+}
+
+/* ==========================================
+   SPELL SELECTION & HUD SPELLS
+   ========================================== */
+.voxel-slot {
+    width: 80px;
+    height: 80px;
+    border: 4px solid #7b00ff;
+    background-color: #1a1a2e;
+    box-shadow: inset -4px -4px 0px 0px #3a007a, 4px 4px 0px 0px #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    color: white;
+}
+
+.drop-slot::before, .hud-slot::after {
+    content: attr(data-key);
+    position: absolute;
+    color: #00f2ff;
+    font-weight: bold;
+    text-shadow: 2px 2px 0px #000;
+}
+.drop-slot::before {
+    top: -25px;
+    font-size: 1rem;
+}
+.hud-slot {
+    width: 60px;
+    height: 60px;
+    border-width: 2px;
+}
+.hud-slot::after {
+    top: 2px;
+    right: 4px;
+    font-size: 0.6rem;
+}
+
+.spell-item {
+    width: 60px;
+    height: 60px;
+    background-color: #7b00ff;
+    border: 2px solid #00f2ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    user-select: none;
+    text-align: center;
+    font-size: 0.5rem;
+    box-shadow: 2px 2px 0px #000;
+}
+.spell-item:active { cursor: grabbing; transform: scale(0.9); }
+
+.hud-needle {
+    position: absolute;
+    width: 4px;
+    height: 50%;
+    background: #00f2ff;
+    bottom: 50%;
+    left: calc(50% - 2px);
+    transform-origin: bottom center;
+    z-index: 5;
+    box-shadow: 0 0 10px #00f2ff;
+    transform: rotate(0deg);
+    pointer-events: none;
+}
+
+#gestureIndicator {
+    position: absolute;
+    top: 60px;
+    right: 30px;
+    font-size: 50px;
+    z-index: 200;
+    text-shadow: 0 0 20px #ffcc00;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+}
+
+#gestureIndicator.hidden {
+    opacity: 0;
+    transform: scale(0.5) rotate(-20deg);
+}
+
+#gestureIndicator.active {
+    opacity: 1;
+    transform: scale(1.2) rotate(0deg);
+    display: block !important;
+}
+/* ==========================================
+   CARTES D'AMÉLIORATION (LEVEL UP)
+   ========================================== */
+.choice-card {
+    width: 280px;
+    height: 450px;
+    background: linear-gradient(135deg, rgba(30, 30, 50, 0.95), rgba(15, 15, 30, 0.98));
+    border: 3px solid #7b00ff;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+    position: relative;
+    box-shadow: 
+        0 0 20px rgba(123, 0, 255, 0.4),
+        8px 8px 0px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: none; /* Le magicCursor s'en occupe */
+    overflow: hidden;
+}
+
+.choice-card::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #7b00ff, transparent);
+    opacity: 0.5;
+}
+
+.choice-card.hovered {
+    transform: translateY(-20px) scale(1.05);
+    border-color: #00f2ff;
+    box-shadow: 
+        0 0 40px rgba(0, 242, 255, 0.6),
+        15px 15px 0px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, rgba(40, 40, 70, 0.98), rgba(20, 20, 40, 1));
+}
+
+.card-title {
+    font-size: 1.1rem;
+    color: #fff;
+    margin-bottom: 40px;
+    text-align: center;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.choice-card.hovered .card-title {
+    color: #00f2ff;
+    text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+}
+
+.card-icon {
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, rgba(123, 0, 255, 0.3) 0%, transparent 70%);
+    margin-bottom: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.card-icon::before {
+    content: "✨";
+    font-size: 40px;
+    filter: drop-shadow(0 0 10px #7b00ff);
+}
+
+.choice-card.hovered .card-icon::before {
+    filter: drop-shadow(0 0 20px #00f2ff);
+    transform: scale(1.2);
+    transition: transform 0.3s;
+}
+
+.card-description {
+    font-size: 0.75rem;
+    color: #aaa;
+    text-align: center;
+    line-height: 1.6;
+    margin-top: 20px;
+    flex-grow: 1;
+}
+
+.choice-card.hovered .card-description {
+    color: #fff;
+}
+/* ==========================================
+   OVERLAY PAUSE (MAIN PERDUE)
+   ========================================== */
+#handLostOverlay {
+    background: rgba(10, 10, 20, 0.85); /* Grisage bleuté sombre */
+    backdrop-filter: blur(8px);
+    z-index: 1000; /* Priorité absolue sur le HUD et le jeu */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.hand-lost-content {
+    text-align: center;
+    padding: 40px;
+    border: 4px solid #ff4444;
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 50px rgba(255, 68, 68, 0.3);
+    border-radius: 20px;
+    max-width: 600px;
+    animation: pulseBorder 2s infinite;
+}
+
+.hand-lost-content p {
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: #ccc;
+    margin: 30px 0;
+}
+
+.hand-icon-anim {
+    font-size: 80px;
+    animation: handWave 2s infinite;
+}
+
+@keyframes pulseBorder {
+    0% { border-color: #ff4444; box-shadow: 0 0 20px rgba(255, 68, 68, 0.3); }
+    50% { border-color: #ff8888; box-shadow: 0 0 40px rgba(255, 136, 136, 0.5); }
+    100% { border-color: #ff4444; box-shadow: 0 0 20px rgba(255, 68, 68, 0.3); }
+}
+
+@keyframes handWave {
+    0% { transform: rotate(-10deg) scale(1); }
+    50% { transform: rotate(10deg) scale(1.1); }
+    100% { transform: rotate(-10deg) scale(1); }
+}
