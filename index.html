@@ -26,6 +26,7 @@
     
     <!-- 1. Styles du projet -->
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/loadout.css">
 </head>
 <body>
 
@@ -122,19 +123,98 @@
         </div>
     </div>
 
-    <!-- SPELL SELECTION (HUB) -->
-    <div id="spellSelectionScreen" class="overlay-container hidden">
-        <div class="panel-content voxel-box" style="background-color: rgba(26,26,46,0.95); max-width: 900px;">
-            <h2 class="pixel-subtitle">CHOISISSEZ VOS SORTS</h2>
-            <p style="font-size: 0.8rem; margin-bottom: 20px; color: #aaa;">Associez un sort magique à chaque forme de dessin.</p>
-            <div id="spellBank" style="display: flex; gap: 15px; margin-bottom: 30px; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px; min-height: 80px; align-items: center; flex-wrap: wrap; justify-content: center;"></div>
-            <div id="dropZones" style="display: flex; gap: 30px; margin-bottom: 30px;">
-                <!-- Les data-key ont été remplacés par des Formes géométriques -->
-                <div class="drop-slot voxel-slot" id="slot-cercle" data-key="O"></div>
-                <div class="drop-slot voxel-slot" id="slot-ligne" data-key="—"></div>
-                <div class="drop-slot voxel-slot" id="slot-triangle" data-key="Δ"></div>
+    <!-- NOUVEAU LOADOUT MENU (HUB) -->
+    <div id="loadoutScreen" class="overlay-container hidden" style="background-color: rgba(10, 10, 20, 0.85); backdrop-filter: blur(12px);">
+        <div class="loadout-container">
+            
+            <!-- PANNEAU GAUCHE: GRIMOIRE (1/3) -->
+            <div class="loadout-left-panel voxel-box">
+                <h2 class="pixel-subtitle">GRIMOIRE</h2>
+                
+                <!-- Les 4 Éléments Équipés -->
+                <div class="equipped-elements-container">
+                    <div class="element-slot" id="element-slot-1"></div>
+                    <div class="element-slot" id="element-slot-2"></div>
+                    <div class="element-slot" id="element-slot-3"></div>
+                    <div class="element-slot" id="element-slot-4"></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Grille des 16 Runes -->
+                <div class="rune-grid-container" id="runeGrid">
+                    <!-- Généré dynamiquement en JS -->
+                </div>
+                
+                <p class="hint-text">Glissez des sorts sur les runes.</p>
             </div>
-            <!-- Plus de bouton StartGameBtn car la fermeture se fera par la distance dans le HUB -->
+
+            <!-- PANNEAU DROITE: ASTROLABE / DETAIL (2/3) -->
+            <div class="loadout-right-panel voxel-box">
+                <!-- Vue Astrolabe -->
+                <div id="astrolabeView" class="view-active">
+                    <h2 class="pixel-subtitle">ASTROLABE</h2>
+                    <div class="astrolabe-graph" id="astrolabeGraph">
+                        <!-- Généré dynamiquement en JS -->
+                    </div>
+                </div>
+
+                <!-- Vue Détail Élément -->
+                <div id="elementDetailView" class="hidden">
+                    <div class="detail-header">
+                        <button id="btnBackToAstrolabe" class="voxel-btn small">◀ ASTROLABE</button>
+                        <h2 class="pixel-subtitle" id="detailElementName">FEU</h2>
+                    </div>
+                    
+                    <div class="detail-content">
+                        <button id="btnEquipElement" class="voxel-btn pulse-glow">ÉQUIPER CET ÉLÉMENT</button>
+                        <div class="spells-list-container" id="elementSpellsList">
+                            <!-- Sorts de l'élément (Draggables) -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- CARROUSEL DE SÉLECTION DE PERSONNAGE -->
+    <div id="characterSelectionScreen" class="overlay-container hidden" style="background-color: transparent !important; display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- Header: Nom du persnnage -->
+        <div class="carousel-header">
+            <h1 id="carouselCharName" class="pixel-title" style="margin-bottom: 0.5rem; text-shadow: 2px 2px 0px #000, 4px 4px 0px #7b00ff;">AZIR</h1>
+            <h3 id="carouselCharClass" style="color: #00f2ff; margin: 0; text-shadow: 2px 2px 0px #000;">Mage de Sable</h3>
+        </div>
+
+        <!-- Flèches de navigation -->
+        <div class="carousel-arrows">
+            <button id="btnPrevChar" class="arrow-btn" aria-label="Previous Character">◀</button>
+            <button id="btnNextChar" class="arrow-btn" aria-label="Next Character">▶</button>
+        </div>
+
+        <!-- Footer: Stats, Bouton Jouer et Cadenas -->
+        <div class="carousel-footer">
+            <div id="carouselStats" class="stats-container voxel-box">
+                <div class="stat-row">
+                    <span class="stat-label">Force</span>
+                    <div class="stat-bar-bg"><div id="statForce" class="stat-bar-fill" style="width: 20%; background: #ff3333;"></div></div>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Vitesse</span>
+                    <div class="stat-bar-bg"><div id="statVitesse" class="stat-bar-fill" style="width: 50%; background: #33cc33;"></div></div>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Magie</span>
+                    <div class="stat-bar-bg"><div id="statMagie" class="stat-bar-fill" style="width: 90%; background: #00f2ff;"></div></div>
+                </div>
+            </div>
+            
+            <div id="carouselLockBanner" class="lock-banner hidden">
+                Condition : <span id="carouselLockCondition">Atteindre le niveau 5</span>
+            </div>
+
+            <button id="btnPlayCharacter" class="voxel-btn pulse-glow">CHOISIR</button>
+            <button id="btnQuitCarousel" class="voxel-btn small" style="margin-top: 15px; background: #333;">RETOUR</button>
         </div>
     </div>
 
@@ -190,5 +270,6 @@
 
     <!-- Script principal du projet (Module) -->
     <script type="module" src="js/main.js"></script>
+    <div id="debugCoord" style="position: absolute; top: 10px; left: 10px; color: yellow; background: rgba(0,0,0,0.5); padding: 5px; font-family: monospace; z-index: 1000; pointer-events: none;"></div>
 </body>
 </html>

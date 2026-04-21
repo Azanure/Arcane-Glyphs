@@ -13,16 +13,19 @@ import { XpOrb } from './entities/XpOrb.js';
 import { SpellManager } from './managers/SpellManager.js';
 import { SpellDatabase } from './configs/SpellDatabase.js';
 import { WaveManager } from './managers/WaveManager.js';
+import { CharacterCarouselManager } from './managers/CharacterCarouselManager.js';
 
 // Imports de l'interface tracking et menu global
 import { initTracking, startShapeDetection } from './tracking.js';
 import { initMenu } from './menu.js';
+import { LoadoutUI } from './ui/LoadoutUI.js';
 
 // --- ÉTATS DU JEU ---
 const GameState = {
     MENU: 0,
     HUB: 1,
-    LEVEL: 2
+    LEVEL: 2,
+    CHARACTER_SELECTION: 3
 };
 let currentState = GameState.MENU;
 
@@ -36,8 +39,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Éléments du HUD et de Sélection des Sorts
     const uiContainer = document.getElementById('uiContainer');
     const hudSpells = document.getElementById('hudSpells');
-    const spellSelectionScreen = document.getElementById('spellSelectionScreen');
-    const spellBank = document.getElementById('spellBank');
+    
+    // Initialisation de la vue Loadout
+    const loadoutUI = new LoadoutUI();
+    
+    // UI du Carousel de personnages
+    const characterSelectionScreen = document.getElementById('characterSelectionScreen');
+    const carouselUI = {
+        charName: document.getElementById('carouselCharName'),
+        charClass: document.getElementById('carouselCharClass'),
+        btnPrev: document.getElementById('btnPrevChar'),
+        btnNext: document.getElementById('btnNextChar'),
+        statForce: document.getElementById('statForce'),
+        statVitesse: document.getElementById('statVitesse'),
+        statMagie: document.getElementById('statMagie'),
+        lockBanner: document.getElementById('carouselLockBanner'),
+        lockCondition: document.getElementById('carouselLockCondition'),
+        btnPlay: document.getElementById('btnPlayCharacter'),
+        btnQuit: document.getElementById('btnQuitCarousel')
+    };
     
     // 2. Initialisation du moteur Babylon.js
     const engine = new BABYLON.Engine(renderCanvas, true);
@@ -45,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- CHARGEMENT DES ASSETS ---
     window.enemyTemplates = {};
+    window.characterTemplates = {};
     async function loadAssets() {
         try {
             // 1. Modèle Course
@@ -69,7 +90,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            console.log("[ASSETS] Modèles de course et d'attaque chargés avec succès.");
+            // 3. Modèles de personnages
+            const charNames = ['azir', 'brand', 'kayle', 'tung tung', 'xerath'];
+            for (let name of charNames) {
+                try {
+                    const resChar = await BABYLON.SceneLoader.ImportMeshAsync("", `assets/characters/player/${name}/`, `${name}.glb`, scene);
+                    resChar.meshes[0].setEnabled(false);
+                    // Stocker le template
+                    window.characterTemplates[name] = { mesh: resChar.meshes[0], animationGroups: resChar.animationGroups };
+                } catch(err) {
+                    console.log(`[ASSETS] Impossible de charger le personnage : ${name}`, err);
+                }
+            }
+
+            console.log("[ASSETS] Modèles de course, d'attaque et de personnages chargés avec succès.");
         } catch (e) {
             console.error("[ASSETS] Erreur lors du chargement des animations", e);
         }
@@ -78,6 +112,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialisation des systèmes de Gameplay
     const environment = new Environment(scene);
+    await environment.init();
+    
     const player = new Player(scene);
     const cameraManager = new CameraManager(scene);
     const spellManager = new SpellManager(scene);
@@ -95,6 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.gameTime = 0;
     let lastRealTime = performance.now();
     window.isGamePaused = true;
+    window.enemiesEnabled = false; // Désactivé par défaut pour le debug
 
     // --- MISE EN PLACE DU HUB ---
     // Le "Portail" pour lancer le niveau
@@ -112,102 +149,114 @@ document.addEventListener('DOMContentLoaded', async () => {
     altarMat.emissiveColor = new BABYLON.Color3(0.8, 0.2, 0.8);
     spellAltar.material = altarMat;
 
-    // --- LOGIQUE DE GESTION DES SORTS DRAG & DROP ---
-    const slots = {
-        'CERCLE': document.getElementById('slot-cercle'),
-        'LIGNE':  document.getElementById('slot-ligne'),
-        'TRIANGLE': document.getElementById('slot-triangle')
-    };
-    
-    const hudSlots = {
-        'CERCLE': document.getElementById('hud-cercle'),
-        'LIGNE':  document.getElementById('hud-ligne'),
-        'TRIANGLE': document.getElementById('hud-triangle')
-    };
+    // L'"Autel" pour les personnages
+    const characterAltar = BABYLON.MeshBuilder.CreateCylinder("charAltar", {height: 1, diameter: 4}, scene);
+    characterAltar.position = new BABYLON.Vector3(-15, 0.5, 0);
+    const charAltarMat = new BABYLON.StandardMaterial("charAltarMat", scene);
+    charAltarMat.emissiveColor = new BABYLON.Color3(1, 0.84, 0); // Gold
+    characterAltar.material = charAltarMat;
 
-    // Remplir la banque de sorts disponible
-    spellBank.innerHTML = ''; // Nettoyer
-    Object.values(SpellDatabase).forEach(spell => {
-        const spellEl = document.createElement('div');
-        spellEl.className = 'spell-item';
-        spellEl.draggable = true;
-        spellEl.dataset.spellId = spell.id;
-        spellEl.innerText = spell.name;
+    // Configuration Manager du Carrousel
+    const playCallback = (selectedCharacter) => {
+        // Retourner au HUB state, cacher l'UI
+        characterSelectionScreen.classList.add('hidden');
+        currentState = GameState.HUB;
         
-        spellEl.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', spell.id);
-        });
-        spellBank.appendChild(spellEl);
-    });
+        // Cacher le carrousel
+        carouselManager.setVisible(false);
+        
+        // Montrer le HUB
+        portal.isVisible = true;
+        spellAltar.isVisible = true;
+        characterAltar.isVisible = true;
 
-    // Configuration des slots pour le Drop
-    Object.values(slots).forEach(slot => {
-        slot.addEventListener('dragover', e => e.preventDefault());
-        slot.addEventListener('drop', e => {
-            e.preventDefault();
-            if (slot.children.length > 0) return; // Un seul sort par slot
-            
-            const spellId = e.dataTransfer.getData('text/plain');
-            if (!spellId) return;
-            const draggedEl = document.querySelector(`.spell-item[data-spell-id="${spellId}"]`);
-            if (draggedEl) {
-                const clone = draggedEl.cloneNode(true);
-                clone.draggable = true;
-                clone.addEventListener('dragstart', dragEvent => {
-                    dragEvent.dataTransfer.setData('text/plain', spellId);
-                    setTimeout(() => clone.remove(), 0);
-                    updateActiveBindings();
-                });
-                slot.appendChild(clone);
-                updateActiveBindings();
-            }
-        });
-    });
+        // Montrer le menu des sorts
+        hudSpells.classList.remove("hidden");
+
+        // Assigner le visuel
+        player.changeCharacterMesh(selectedCharacter);
+        
+        // Repositionner la caméra en mode normal
+        cameraManager.setTarget(player.mesh);
+    };
+
+    const carouselManager = new CharacterCarouselManager(scene, carouselUI, playCallback);
     
-    spellBank.addEventListener('dragover', e => e.preventDefault());
-    spellBank.addEventListener('drop', e => e.preventDefault()); // Autorise de jeter un sort du slot
+    // Définir les 5 personnages
+    const charsData = [
+        { name: "Azir", className: "Empereur des Sables", modelName: "azir", unlocked: true, stats: { force: 30, vitesse: 60, magie: 90 } },
+        { name: "Brand", className: "Vengeur Flamboyant", modelName: "brand", unlocked: true, stats: { force: 20, vitesse: 40, magie: 100 } },
+        { name: "Kayle", className: "Justicière Céleste", modelName: "kayle", unlocked: false, unlockCondition: "Atteindre la Vague 10", stats: { force: 80, vitesse: 70, magie: 80 } },
+        { name: "Tung Tung", className: "Moine Aveugle", modelName: "tung tung", unlocked: false, unlockCondition: "Vaincre 1000 ennemis", stats: { force: 95, vitesse: 90, magie: 20 } },
+        { name: "Xerath", className: "Mage Ascendant", modelName: "xerath", unlocked: false, unlockCondition: "Trouver le Glyphe Perdu", stats: { force: 10, vitesse: 30, magie: 100 } }
+    ];
+    carouselManager.initCharacters(charsData, window.characterTemplates);
+    carouselManager.setVisible(false); // Cacher au départ
 
-    let activeBindings = []; // Ex: [{ shape: 'CERCLE', spellCode: SpellDatabase.FIREBALL }, ...]
+    // Binding pour quitter le carrousel
+    carouselUI.btnQuit.addEventListener('click', () => {
+        if(carouselManager.isAnimating) return;
+        characterSelectionScreen.classList.add('hidden');
+        currentState = GameState.HUB;
+        carouselManager.setVisible(false);
+        portal.isVisible = true;
+        spellAltar.isVisible = true;
+        characterAltar.isVisible = true;
+        hudSpells.classList.remove("hidden");
+        cameraManager.setTarget(player.mesh);
+    });
 
+    // On met à jour l'affichage en bas de l'écran avec les données du LoadoutManager
     function updateActiveBindings() {
-        activeBindings = [];
-        Object.keys(slots).forEach(shapeKey => {
-            const slot = slots[shapeKey];
-            if (slot.children.length > 0) {
-                const spellId = slot.children[0].dataset.spellId;
-                const spellCode = Object.values(SpellDatabase).find(s => s.id === spellId);
-                activeBindings.push({ shape: shapeKey, spellCode });
+        const loadout = window.loadoutManager.getLoadout(); // On y a accès via module ou window
+        window.activeSpellIds = [];
 
-                // Update HUD Name
-                const nameEl = hudSlots[shapeKey].querySelector('.hud-spell-name');
-                if (nameEl) nameEl.innerText = spellCode.name;
+        ['CERCLE', 'LIGNE', 'TRIANGLE'].forEach(shapeKey => {
+            const spell = loadout.bindings[shapeKey];
+            const hudSlot = document.getElementById(`hud-${shapeKey.toLowerCase()}`);
+            if (!hudSlot) return;
+
+            const nameEl = hudSlot.querySelector('.hud-spell-name');
+            if (spell) {
+                window.activeSpellIds.push(spell.id);
+                nameEl.innerText = spell.name;
+                hudSlot.style.color = window.ElementDatabase[spell.element]?.color || '#fff';
             } else {
-                // Clear HUD Name if slot is empty
-                const nameEl = hudSlots[shapeKey].querySelector('.hud-spell-name');
-                if (nameEl) nameEl.innerText = '';
+                nameEl.innerText = '';
+                hudSlot.style.color = '';
             }
         });
-        window.activeSpellIds = activeBindings.map(b => b.spellCode.id);
     }
+
+    // Export pour LoadoutUI ou tracking :
+    window.updateActiveBindingsHub = updateActiveBindings;
 
     // --- INTEGRATION DU TRACKING ET DU CAST DE SORT ---
     // Cette fonction sera appelée par tracking.js quand une forme est reconnue
     window.onShapeDetected = (detectedShape) => {
-        if (currentState !== GameState.LEVEL) return; // On ne cast que dans le niveau
+        // Autorise le cast si on est dans un niveau OU si on est dans le HUB en mode Debug
+        const isAllowedState = currentState === GameState.LEVEL || (currentState === GameState.HUB && window.isDebugMouseMode);
+        
+        if (!isAllowedState) {
+            console.log(`[MAGIC] Détection ignorée : état de jeu incompatible (${currentState}).`);
+            return;
+        }
 
         console.log(`[MAGIC] Forme détectée : ${detectedShape}`);
         
-        // Chercher si un sort est lié à cette forme
-        const binding = activeBindings.find(b => b.shape === detectedShape);
-        if (binding) {
+        // Obtenir le loadout
+        const loadout = window.loadoutManager.getLoadout();
+        const spell = loadout.bindings[detectedShape];
+        
+        if (spell) {
             // Lancer le calcul de cast depuis le manager
-            let lastTime = spellManager.cooldowns[binding.spellCode.id] || 0;
-            let cooldownMs = binding.spellCode.cooldown * 1000;
+            let lastTime = spellManager.cooldowns[spell.id] || 0;
+            let cooldownMs = spell.cooldown * 1000;
             
             if (window.gameTime - lastTime >= cooldownMs) {
-                spellManager.castSpell(binding.spellCode, player, enemies);
-                spellManager.cooldowns[binding.spellCode.id] = window.gameTime;
-                console.log(`[MAGIC] Sort ${binding.spellCode.name} lancé !`);
+                spellManager.castSpell(spell, player, enemies);
+                spellManager.cooldowns[spell.id] = window.gameTime;
+                console.log(`[MAGIC] Sort ${spell.name} lancé !`);
             } else {
                 console.log(`[MAGIC] Sort en Cooldown.`);
             }
@@ -220,6 +269,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Initialisation du Tracking (MediaPipe)
     initTracking(videoElement, drawingCanvas, magicCursor);
+    startShapeDetection(); // Toujours actif pour permettre le debug / HUB interaction
 
     function resizeDrawingCanvas() {
         if (drawingCanvas) {
@@ -253,8 +303,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.isGamePaused = false;
         
         // On affiche les HUD virtuels (vides pour l'instant)
-        uiContainer.classList.remove("hidden");
-        hudSpells.classList.remove("hidden");
+        uiContainer.classList.add("hidden"); // Cacher HP/XP dans le HUB
+        hudSpells.classList.remove("hidden"); // Garder les sorts visibles
     };
 
     /**
@@ -264,9 +314,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`[MAIN] Passage en mode COMBAT (Level)`);
         currentState = GameState.LEVEL;
         
+        // Mode Environnement Level
+        environment.setMode('LEVEL');
+        
         // On cache le HUB physique
         portal.isVisible = false;
         spellAltar.isVisible = false;
+        characterAltar.isVisible = false;
+        
+        // On affiche le HUD de combat
+        uiContainer.classList.remove("hidden");
         
         // Reset player au centre
         player.mesh.position = BABYLON.Vector3.Zero();
@@ -281,6 +338,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.returnToHub = () => {
         console.log("[MAIN] Retour au HUB (Échec ou Réinitialisation)");
         currentState = GameState.HUB;
+        
+        // Mode Environnement HUB (Plateforme verte)
+        environment.setMode('HUB');
         
         // Réinitialiser le Joueur
         player.isDead = false;
@@ -301,6 +361,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Cacher les écrans de fin si présent
         document.getElementById("gameOverScreen").style.display = "none";
+        
+        // Cacher le HUD de combat
+        uiContainer.classList.add("hidden");
     };
 
 
@@ -337,19 +400,67 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Détection de proximité Autel -> Affiche UI Sorts
             if (BABYLON.Vector3.Distance(player.mesh.position, spellAltar.position) < 4) {
-               if(spellSelectionScreen.classList.contains("hidden")) {
-                   spellSelectionScreen.classList.remove("hidden");
+               if(loadoutUI.domElements.screen.classList.contains("hidden")) {
+                   loadoutUI.show();
                }
             } else {
-               if(!spellSelectionScreen.classList.contains("hidden")) {
-                   spellSelectionScreen.classList.add("hidden");
+               if(!loadoutUI.domElements.screen.classList.contains("hidden")) {
+                   loadoutUI.hide();
                }
+            }
+
+            // Détection de proximité Character Altar -> Lance la UI de Selection
+            if (BABYLON.Vector3.Distance(player.mesh.position, characterAltar.position) < 3) {
+                console.log("[MAIN] Entrée dans la Sélection de Personnage");
+                currentState = GameState.CHARACTER_SELECTION;
+                
+                // Cacher les autres UI et le monde
+                loadoutUI.hide();
+                hudSpells.classList.add('hidden'); // Cacher la barre du bas
+                portal.isVisible = false;
+                spellAltar.isVisible = false;
+                characterAltar.isVisible = false;
+                
+                // Préparer la caméra pour une vue de face (POV)
+                scene.activeCamera.lockedTarget = null;
+                
+                // On positionne la caméra bien en face du slot central (situé à z=4)
+                scene.activeCamera.position = new BABYLON.Vector3(0, 2.5, 12); 
+                scene.activeCamera.setTarget(new BABYLON.Vector3(0, 2.5, 4));
+                
+                carouselManager.setVisible(true);
+                characterSelectionScreen.classList.remove("hidden");
+                
+                // On déplace le joueur pour ne pas qu'il gêne
+                player.mesh.position.copyFrom(new BABYLON.Vector3(-10, 0, 0)); 
+            }
+        }
+        
+        if (currentState === GameState.CHARACTER_SELECTION) {
+            // Dans ce state, on peut écouter les touches clavier Left/Right si besoin
+            if (inputManager.isKeyPressed('ArrowLeft') || inputManager.isKeyPressed('KeyA')) {
+                // Pour éviter le spam frame par frame :
+                if(!carouselManager._leftPressed) {
+                    carouselManager.rotateCarousel(-1);
+                    carouselManager._leftPressed = true;
+                }
+            } else {
+                carouselManager._leftPressed = false;
+            }
+            
+            if (inputManager.isKeyPressed('ArrowRight') || inputManager.isKeyPressed('KeyD')) {
+                if(!carouselManager._rightPressed) {
+                    carouselManager.rotateCarousel(1);
+                    carouselManager._rightPressed = true;
+                }
+            } else {
+                carouselManager._rightPressed = false;
             }
         }
 
         if (currentState === GameState.LEVEL && !window.isGamePaused) {
             // Spawn enemies
-            if (currentTime - lastSpawnTime >= enemySpawnRate) {
+            if (window.enemiesEnabled && currentTime - lastSpawnTime >= enemySpawnRate) {
                 let spawnDistance = 20 + Math.random() * 10;
                 let enemyType = waveManager.spawnEnemy(player);
                 
@@ -406,30 +517,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // UPDATE COOLDOWNS HUD GLOBAL (HUB & LEVEL)
         if(currentState !== GameState.MENU) {
-            activeBindings.forEach(binding => {
-                const shape = binding.shape;
-                const spellId = binding.spellCode.id;
-                
-                const cooldownMs = binding.spellCode.cooldown * 1000;
+            const loadout = window.loadoutManager.getLoadout();
+            
+            ['CERCLE', 'LIGNE', 'TRIANGLE'].forEach(shape => {
+                const spell = loadout.bindings[shape];
+                if (!spell) return;
+
+                const spellId = spell.id;
+                const cooldownMs = spell.cooldown * 1000;
                 const lastTime = spellManager.cooldowns[spellId] || -999999;
                 const elapsed = currentTime - lastTime;
                 
                 let angle = 0;
                 if (elapsed < cooldownMs) {
                     const progress = elapsed / cooldownMs;
-                    // L'aiguille tourne de 0 à 360 pendant la recharge
                     angle = progress * 360;
-                } else {
-                    angle = 0; // Pointe vers le haut quand prêt
                 }
                 
-                const needle = hudSlots[shape].querySelector('.hud-needle');
+                const hudSlot = document.getElementById(`hud-${shape.toLowerCase()}`);
+                const needle = hudSlot ? hudSlot.querySelector('.hud-needle') : null;
                 if (needle) {
                     needle.style.transform = `rotate(${angle}deg)`;
                 }
             });
         }
         
+        // Mise à jour du monde procédural infini
+        environment.update(player.mesh.position);
+
+        // DEBUG HUD : Coordonnées
+        const debugDiv = document.getElementById("debugCoord");
+        if (debugDiv) {
+            const px = player.mesh.position.x.toFixed(1);
+            const pz = player.mesh.position.z.toFixed(1);
+            const cx = Math.floor(player.mesh.position.x / 32);
+            const cz = Math.floor(player.mesh.position.z / 32);
+            debugDiv.innerText = `POS: ${px}, ${pz} | CHUNK: ${cx}, ${cz} | MODE: ${environment.mode}`;
+        }
+
         scene.render();
     });
 

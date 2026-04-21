@@ -622,3 +622,131 @@ input[type=range]::-webkit-slider-thumb {
     50% { transform: rotate(10deg) scale(1.1); }
     100% { transform: rotate(-10deg) scale(1); }
 }
+
+/* ==========================================
+   CARROUSEL DE PERSONNAGES (ROGUELIKE)
+   ========================================== */
+   
+#characterSelectionScreen {
+    /* Le overlay transparent via JS, on veut voir le monde 3D. */
+    /* background est deja overload en inline mais assurens nous : */
+    background: transparent !important;
+    backdrop-filter: none; /* Pas de flou global, on gère avec la caméra 3D */
+    padding: 20px 0;
+    pointer-events: none; /* On laisse cliquer au travers sauf sur les enfants */
+}
+
+#characterSelectionScreen > * {
+    pointer-events: auto;
+}
+
+.carousel-header {
+    text-align: center;
+    margin-top: 5vh;
+}
+
+.carousel-arrows {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 5vw;
+}
+
+.arrow-btn {
+    background: rgba(0, 0, 0, 0.5);
+    border: 3px solid #7b00ff;
+    color: #fff;
+    font-size: 2rem;
+    padding: 15px 25px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0px #000;
+    transition: all 0.2s ease;
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+}
+
+.arrow-btn:hover {
+    background: #7b00ff;
+    transform: scale(1.1);
+    box-shadow: 0 0 20px #7b00ff;
+}
+
+.arrow-btn:active {
+    transform: scale(0.9);
+}
+
+.carousel-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 5vh;
+    padding: 0 20vw;
+}
+
+.stats-container {
+    background-color: rgba(26, 26, 46, 0.9) !important; /* Léger overwrite voxel-box */
+    padding: 20px !important;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 300px;
+    border-color: #3a007a !important;
+}
+
+.stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.6rem;
+}
+
+.stat-label {
+    width: 80px;
+    text-align: right;
+    margin-right: 10px;
+}
+
+.stat-bar-bg {
+    flex-grow: 1;
+    height: 12px;
+    background: #000;
+    border: 2px solid #555;
+    position: relative;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    transition: width 0.4s ease-out;
+}
+
+.lock-banner {
+    background: repeating-linear-gradient(
+        45deg,
+        #111,
+        #111 10px,
+        #331111 10px,
+        #331111 20px
+    );
+    border: 3px solid #ff3333;
+    color: #fff;
+    padding: 10px 20px;
+    font-size: 0.7rem;
+    box-shadow: 4px 4px 0px #000;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.pulse-glow {
+    animation: buttonPulse 2s infinite;
+}
+
+@keyframes buttonPulse {
+    0% { box-shadow: 0 0 10px #7b00ff; }
+    50% { box-shadow: 0 0 30px #00f2ff; }
+    100% { box-shadow: 0 0 10px #7b00ff; }
+}

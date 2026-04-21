@@ -16,27 +16,35 @@ export class Player {
         this.attractionRadius = 10;
         this.isDead = false;
         
-        this.mesh = BABYLON.MeshBuilder.CreateCapsule("player", {height: 2, radius: 0.5}, this.scene);
-        this.mesh.position.y = 1; 
+        // La racine du joueur est maintenant un TransformNode (plus de capsule)
+        this.mesh = new BABYLON.TransformNode("player", this.scene);
+        this.mesh.position.y = 0; 
 
-        const mat = new BABYLON.StandardMaterial("playerMat", scene);
-        mat.diffuseColor = new BABYLON.Color3(0, 0.7, 1);
-        this.mesh.material = mat;
+        // --- CONFIGURATION COLLISIONS ---
+        this.scene.collisionsEnabled = true;
+        // Ellipsoïde pour un personnage de ~2m de haut et 1m de large (rayon 0.5)
+        // Note: l'ellipsoïde sur un TransformNode nécessite un mesh parent ou d'être appliqué au mesh de base.
+        // On va tricher en utilisant un petit mesh invisible pour porter la collision si besoin,
+        // mais normalement on peut le mettre sur le root si c'est un AbstractMesh.
+        // Ici on va s'assurer que le mesh est un maillage pour moveWithCollisions.
+        this.mesh = BABYLON.MeshBuilder.CreateBox("playerProxy", {size: 0.1}, this.scene);
+        this.mesh.isVisible = false;
+        this.mesh.checkCollisions = true;
+        this.mesh.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
+        this.mesh.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0); 
+        this.mesh.position.y = 0; 
+
+        // --- CHARGEMENT DE BRAND PAR DÉFAUT ---
+        this.visualMesh = null;
+        this.hitbox = null; 
         
-        // --- HITBOX JOUEUR ---
-        this.hitbox = BABYLON.MeshBuilder.CreateBox("playerHitbox", {size: 1.5}, scene);
-        this.hitbox.parent = this.mesh;
-        this.hitbox.position.y = 1; // Centré sur le corps
-        this.hitbox.isPickable = false;
-        
-        // Style Debug Hitbox (Semi-transparent)
-        const hitboxMat = new BABYLON.StandardMaterial("hitboxMat", scene);
-        hitboxMat.diffuseColor = new BABYLON.Color3(0, 1, 0);
-        hitboxMat.alpha = 0.2; // Très discret
-        this.hitbox.material = hitboxMat;
- 
+        // On attend que les templates soient prêts (normalement chargés dans main.js)
+        setTimeout(() => {
+            this.setupBrandVisual();
+        }, 100);
 
         // Tir automatique
+        this.shootCooldown = 1000; // time in ms between shots
         this.shootCooldown = 1000; // time in ms between shots
         this.baseShootCooldown = 1000;
         this.lastShootTime = 0;
@@ -61,8 +69,51 @@ export class Player {
         // --- Système de Sélection (Level Up) ---
         this.activeCardChoices = [];
         
+        this.visualMesh = null; // Gérer le modèle statique
+
         this.updateUI();
         this.setupUpgrades();
+        
+        // Raycast utility
+        this.downRay = new BABYLON.Ray(BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, -1, 0), 10);
+    }
+
+    setupBrandVisual() {
+        const brandTemplate = window.characterTemplates ? window.characterTemplates['brand'] : null;
+        if (!brandTemplate) return;
+
+        // 1. Visuel Normal
+        this.visualMesh = brandTemplate.mesh.clone("playerVisual", this.mesh);
+        this.visualMesh.setEnabled(true);
+        this.visualMesh.isVisible = true;
+
+        // 2. Halo Vert de Collision (Copie de Brand)
+        this.hitbox = brandTemplate.mesh.clone("playerHitbox", this.mesh);
+        this.hitbox.setEnabled(true);
+        
+        const haloMat = new BABYLON.StandardMaterial("haloMat", this.scene);
+        haloMat.diffuseColor = new BABYLON.Color3(0, 1, 0);
+        haloMat.emissiveColor = new BABYLON.Color3(0, 0.5, 0);
+        haloMat.alpha = 0.3; // Translucide vert
+        
+        this.hitbox.getChildMeshes().forEach(m => {
+            m.material = haloMat;
+            m.isVisible = true;
+            m.isPickable = false;
+        });
+
+        // Configurer les deux meshes
+        [this.visualMesh, this.hitbox].forEach(m => {
+            m.scaling = new BABYLON.Vector3(7, 7, 7);
+            // On le remonte de 3.5 (la moitié de sa taille à l'échelle) pour que les pieds touchent le sol
+            m.position = new BABYLON.Vector3(0, 3.5, 0);
+            m.rotation = new BABYLON.Vector3(0, Math.PI, 0);
+            m.setEnabled(true);
+        });
+    }
+
+    changeCharacterMesh(characterData) {
+        // ... (cette méthode pourra être mise à jour plus tard, brand est le défaut maintenant)
     }
 
     takeDamage(amount) {
@@ -279,8 +330,17 @@ export class Player {
                 if (titleEl) titleEl.innerHTML = title;
                 if (descEl) descEl.innerHTML = description;
                 
+                // --- AJOUT CLIC SOURIS (DEBUG/ACCESSIBILITÉ) ---
+                // On clone pour éviter les doublons d'events si on level up plusieurs fois
+                const newCard = cardEl.cloneNode(true);
+                cardEl.parentNode.replaceChild(newCard, cardEl);
+                newCard.addEventListener('click', () => {
+                    console.log("[PLAYER] Upgrade sélectionnée par Clic Souris !");
+                    if (action) action();
+                });
+
                 // On stocke le callback et l'élément pour la détection de survol/geste
-                this.activeCardChoices.push({ element: cardEl, action: action });
+                this.activeCardChoices.push({ element: newCard, action: action });
             } else {
                 cardEl.style.visibility = "hidden";
             }
@@ -317,8 +377,79 @@ export class Player {
         });
     }
 
+    /**
+     * Vérifie si un point (et son périmètre de 0.5m) touche un danger (lave ou trou).
+     * @returns true si un danger est détecté sous les pieds.
+     */
+    checkHazardAt(position) {
+        // Points à vérifier : Centre + 4 points cardinaux (périmètre de 0.5m)
+        const offsets = [
+            new BABYLON.Vector3(0, 0, 0),
+            new BABYLON.Vector3(0.5, 0, 0),
+            new BABYLON.Vector3(-0.5, 0, 0),
+            new BABYLON.Vector3(0, 0, 0.5),
+            new BABYLON.Vector3(0, 0, -0.5)
+        ];
+
+        for (let offset of offsets) {
+            const checkPos = position.add(offset);
+            // On part d'un peu plus haut (Y+2) pour être sûr de traverser le sol
+            const ray = new BABYLON.Ray(new BABYLON.Vector3(checkPos.x, checkPos.y + 2, checkPos.z), new BABYLON.Vector3(0, -1, 0), 10);
+
+            const hit = this.scene.pickWithRay(ray, (mesh) => {
+                // IGNORER les objets désactivés (important pour le passage HUB/NIVEAU)
+                if (!mesh.isEnabled()) return false;
+
+                // CRUCIAL : Ignorer le joueur lui-même et ses enfants visuels
+                if (mesh === this.mesh || mesh.name.toLowerCase().includes("player") || mesh.name.toLowerCase().includes("brand")) return false;
+                
+                // On peut aussi ignorer les projectiles
+                if (mesh.name.toLowerCase().includes("projectile")) return false;
+                
+                return true; 
+            });
+
+            if (hit.hit && hit.pickedMesh) {
+                const meshName = hit.pickedMesh.name.toLowerCase();
+                const sourceName = hit.pickedMesh.sourceMesh ? hit.pickedMesh.sourceMesh.name.toLowerCase() : "";
+                
+                // Si l'un des noms contient "lava", "pit" ou "trou", on bloque
+                if (meshName.includes("lava") || sourceName.includes("lava") || 
+                    meshName.includes("pit") || meshName.includes("trou")) {
+                    console.log(`[DEBUG] Blocage détecté sur mesh : ${meshName} (Source: ${sourceName}) à la position :`, checkPos);
+                    return true; 
+                }
+            }
+        }
+        return false;
+    }
+
+    checkTerrain() {
+        // On conserve cette méthode pour les effets secondaires (vitesse, dégâts)
+        // si jamais le joueur se retrouve coincé dans la lave pour une raison X
+        const onHazard = this.checkHazardAt(this.mesh.position);
+        
+        if (onHazard) {
+            this.speed = this.baseSpeed * 0.4;
+            if (window.gameTime % 60 < 2) { 
+                this.takeDamage(0.2); 
+            }
+        } else {
+            this.speed = this.baseSpeed;
+        }
+    }
+
     update(inputManager, enemies = []) {
         if (this.isDead) return;
+
+        // Protection anti-chute (si bug de collision)
+        if (this.mesh.position.y < -5) {
+            this.mesh.position.y = 1.0;
+            console.warn("[PLAYER] Chute détectée, remise à la surface.");
+        }
+
+        // --- 0. Vérification du terrain ---
+        this.checkTerrain();
 
         // --- 1. Gestion du Mouvement ---
         // 1. On récupère la caméra de la scène
@@ -356,9 +487,31 @@ export class Player {
             moveDirection.normalize();
         }
 
-        // 6. On applique enfin le mouvement au joueur
-        this.mesh.position.x += moveDirection.x * this.speed;
-        this.mesh.position.z += moveDirection.z * this.speed;
+        // 6. Décomposition du mouvement pour permettre la "glissade" le long des obstacles
+        const dX = moveDirection.x * this.speed;
+        const dZ = moveDirection.z * this.speed;
+
+        // --- MOUVEMENT SUR L'AXE X ---
+        if (Math.abs(dX) > 0.0001) {
+            const oldPos = this.mesh.position.clone();
+            this.mesh.moveWithCollisions(new BABYLON.Vector3(dX, 0, 0));
+            if (this.checkHazardAt(this.mesh.position)) {
+                this.mesh.position.copyFrom(oldPos);
+            }
+        }
+
+        // --- MOUVEMENT SUR L'AXE Z ---
+        if (Math.abs(dZ) > 0.0001) {
+            const oldPos = this.mesh.position.clone();
+            this.mesh.moveWithCollisions(new BABYLON.Vector3(0, 0, dZ));
+            if (this.checkHazardAt(this.mesh.position)) {
+                this.mesh.position.copyFrom(oldPos);
+            }
+        }
+
+        // --- GRAVITÉ (Axe Y) ---
+        // Toujours essayer de descendre un peu pour rester collé au sol
+        this.mesh.moveWithCollisions(new BABYLON.Vector3(0, -0.05, 0));
 
         // --- 2. Tir Automatique ---
         let currentTime = window.gameTime;

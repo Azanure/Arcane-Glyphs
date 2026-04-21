@@ -20,11 +20,100 @@ const FADE_DURATION = 500; // ms
 let smoothedX = window.innerWidth / 2;
 let smoothedY = window.innerHeight / 2;
 
+window.isDebugMouseMode = false;
+
 /**
  * Initialise le tracking des mains
  */
 export function initTracking(videoElement, drawingCanvas, magicCursor) {
     const ctx = drawingCanvas.getContext('2d');
+
+    // == MODE DEBUG SOURIS ==
+    window.addEventListener('keydown', (e) => {
+        if (e.key === "Tab") {
+            e.preventDefault();
+            window.isDebugMouseMode = !window.isDebugMouseMode;
+            
+            if (videoElement) {
+                videoElement.style.opacity = window.isDebugMouseMode ? "0" : "1";
+            }
+            
+            if (window.isDebugMouseMode) {
+                if (window.isPausedByHandLoss) {
+                    const overlay = document.getElementById("handLostOverlay");
+                    if (overlay) overlay.classList.add("hidden");
+                    window.isPausedByHandLoss = false;
+                    
+                    // On ne retire la pause globale que si aucun autre écran (Level Up) n'est actif
+                    const levelUpScreen = document.getElementById("levelUpScreen");
+                    if (!levelUpScreen || levelUpScreen.classList.contains("hidden")) {
+                        window.isGamePaused = false;
+                    }
+                }
+                showToast("Mode Souris Activé (TAB pour annuler)");
+            } else {
+                showToast("Mode Tracking Caméra Activé");
+            }
+        }
+    });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!window.isDebugMouseMode) return;
+        smoothedX = e.clientX;
+        smoothedY = e.clientY;
+        window.smoothedCursorX = smoothedX;
+        window.smoothedCursorY = smoothedY;
+        
+        if (magicCursor) {
+            magicCursor.style.left = `${smoothedX}px`;
+            magicCursor.style.top = `${smoothedY}px`;
+        }
+
+        // Sécurité : si on n'a plus le bouton pressé mais qu'on dessine encore (ex: sortie de fenêtre)
+        if (isDrawing && e.buttons !== 1) {
+            finishDrawing();
+            updateTrackingStatus('waiting');
+            if (magicCursor) magicCursor.classList.remove('drawing');
+            return;
+        }
+
+        if (isDrawing) {
+            // Ajout direct sans seuil pour garantir la visibilité immédiate
+            drawingPoints.push({ x: smoothedX, y: smoothedY });
+        }
+    }, { capture: true });
+
+    document.addEventListener('pointerdown', (e) => {
+        if (!window.isDebugMouseMode) return;
+        if (e.button !== 0) return; // clic gauche uniquement
+        
+        if (magicCursor) {
+            updateTrackingStatus('correct');
+            magicCursor.classList.remove('lost');
+
+            if (!isDrawing && !window.preventNewDrawing) {
+                console.log("[DEBUG] pointerdown -> start drawing");
+                isDrawing = true;
+                drawingPoints = [{ x: e.clientX, y: e.clientY }]; // Ajout du premier point immédiatement
+                magicCursor.classList.add('drawing');
+            }
+        }
+    }, { capture: true });
+
+    document.addEventListener('pointerup', (e) => {
+        if (!window.isDebugMouseMode) return;
+        if (e.button !== 0) return;
+        
+        if (isDrawing) {
+            finishDrawing();
+        }
+        window.preventNewDrawing = false; // Permet de redessiner immédiatement
+        updateTrackingStatus('waiting');
+        if (magicCursor) {
+            magicCursor.classList.remove('drawing');
+        }
+    }, { capture: true });
+    // =======================
 
     const hands = new Hands({
         locateFile: (file) => {
@@ -40,34 +129,7 @@ export function initTracking(videoElement, drawingCanvas, magicCursor) {
     });
 
     hands.onResults((results) => {
-        ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-        // 1. Animation de fondu
-        if (fadeStartTime > 0) {
-            let elapsed = performance.now() - fadeStartTime;
-            if (elapsed < FADE_DURATION) {
-                let progress = elapsed / FADE_DURATION;
-                ctx.save();
-                ctx.globalAlpha = 1.0 - progress;
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.shadowBlur = 30;
-                ctx.shadowColor = '#FFD700'; 
-                ctx.lineWidth = 10;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
-                if (fadingPoints.length > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(fadingPoints[0].x, fadingPoints[0].y);
-                    for (let i = 1; i < fadingPoints.length; i++) ctx.lineTo(fadingPoints[i].x, fadingPoints[i].y);
-                    ctx.stroke();
-                }
-                ctx.restore();
-            } else {
-                fadeStartTime = 0;
-                fadingPoints = [];
-            }
-        }
+        if (window.isDebugMouseMode) return;
 
         // Si une main est trouvée
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -160,22 +222,64 @@ export function initTracking(videoElement, drawingCanvas, magicCursor) {
             }
         }
 
+    });
+
+    // --- BOUCLE DE DESSIN INDÉPENDANTE ---
+    function renderLoop() {
+        ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        
+        // 1. Animation de fondu
+        if (fadeStartTime > 0) {
+            let elapsed = performance.now() - fadeStartTime;
+            if (elapsed < FADE_DURATION) {
+                let progress = elapsed / FADE_DURATION;
+                ctx.save();
+                ctx.globalAlpha = 1.0 - progress;
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#FFD700'; 
+                ctx.lineWidth = 10;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                if (fadingPoints.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(fadingPoints[0].x, fadingPoints[0].y);
+                    for (let i = 1; i < fadingPoints.length; i++) ctx.lineTo(fadingPoints[i].x, fadingPoints[i].y);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            } else {
+                fadeStartTime = 0;
+                fadingPoints = [];
+            }
+        }
+
         // Dessiner le tracé actif
         if (isDrawing && drawingPoints.length > 1) {
             ctx.save();
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 6;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(drawingPoints[0].x, drawingPoints[0].y);
-            for (let i = 1; i < drawingPoints.length; i++) ctx.lineTo(drawingPoints[i].x, drawingPoints[i].y);
+            for (let i = 1; i < drawingPoints.length; i++) {
+                ctx.lineTo(drawingPoints[i].x, drawingPoints[i].y);
+            }
             ctx.stroke();
             ctx.restore();
         }
-    });
+
+        requestAnimationFrame(renderLoop);
+    }
+    // Lancer la boucle de rendu
+    renderLoop();
 
     function finishDrawing() {
+        console.log("[DEBUG] finishDrawing called, points:", drawingPoints.length);
         if (!isDrawing) return;
         isDrawing = false;
         framesWithoutPinch = 0;
@@ -183,13 +287,16 @@ export function initTracking(videoElement, drawingCanvas, magicCursor) {
         magicCursor.classList.remove('drawing');
         
         if (drawingPoints.length > 5) {
+            console.log("[DEBUG] Starting detectShape...");
             const detectedValue = detectShape(drawingPoints);
+            console.log("[DEBUG] Shape detected:", detectedValue);
             if (detectedValue) {
                 fadingPoints = [...drawingPoints];
                 fadeStartTime = performance.now();
             }
         }
         drawingPoints = [];
+        console.log("[DEBUG] finishDrawing finished.");
     }
 
     const camera = new Camera(videoElement, {
@@ -205,27 +312,53 @@ export function stopShapeDetection() { _shapeDetectionActive = false; }
 
 /**
  * Ré-échantillonne un tracé pour obtenir exactement n points équidistants
+ * Version sécurisée sans modification de tableau (immuable)
  */
 function resample(points, n) {
+    console.log("[DEBUG] resample started with", points.length, "points");
     if (points.length === 0) return [];
-    const I = pathLength(points) / (n - 1); // Intervalle de distance
-    let D = 0;
+    if (points.length === 1) return Array(n).fill({ ...points[0] });
+
+    let totalLen = pathLength(points);
+    if (totalLen < 0.001) return Array(n).fill({ ...points[0] });
+
+    const interval = totalLen / (n - 1);
+    let cumulativeDist = 0;
     const newPoints = [points[0]];
     
+    // On parcourt les segments originaux
     for (let i = 1; i < points.length; i++) {
-        let d = distance(points[i - 1], points[i]);
-        if (D + d >= I) {
-            let qx = points[i - 1].x + ((I - D) / d) * (points[i].x - points[i - 1].x);
-            let qy = points[i - 1].y + ((I - D) / d) * (points[i].y - points[i - 1].y);
-            let q = { x: qx, y: qy };
-            newPoints.push(q);
-            points.splice(i, 0, q); // Insère q pour le prochain segment
-            D = 0;
-        } else D += d;
+        const p1 = points[i - 1];
+        const p2 = points[i];
+        let d = distance(p1, p2);
+
+        if (cumulativeDist + d >= interval) {
+            // On peut extraire un ou plusieurs points de ce segment
+            let currentDistOnSegment = interval - cumulativeDist;
+            while (currentDistOnSegment <= d && newPoints.length < n) {
+                const ratio = d === 0 ? 0 : currentDistOnSegment / d;
+                newPoints.push({
+                    x: p1.x + ratio * (p2.x - p1.x),
+                    y: p1.y + ratio * (p2.y - p1.y)
+                });
+                d -= currentDistOnSegment; // Distance restante sur le segment original
+                // On repart du point qu'on vient de créer pour le prochain intervalle
+                // (En réalité on ajuste juste pour simuler qu'on a "consommé" un intervalle)
+                currentDistOnSegment = interval; 
+                cumulativeDist = 0;
+            }
+            // Ce qu'il reste du segment après avoir extrait les points
+            cumulativeDist = d; 
+        } else {
+            cumulativeDist += d;
+        }
     }
-    
-    // S'assurer qu'on a exactement n points (ajoute le dernier si besoin)
-    if (newPoints.length < n) newPoints.push(points[points.length - 1]);
+
+    // Sécurité : compléter si nécessaire (flottants capricieux)
+    while (newPoints.length < n) {
+        newPoints.push({ ...points[points.length - 1] });
+    }
+
     return newPoints.slice(0, n);
 }
 
@@ -244,6 +377,10 @@ function distance(p1, p2) {
  */
 function detectShape(rawPoints) {
     if (!_shapeDetectionActive || rawPoints.length < 5) return null;
+
+    // Sécurité supplémentaire : si le tracé est minuscule, ignorer
+    const totalLen = pathLength(rawPoints);
+    if (totalLen < 20) return null; 
 
     // 1. Ré-échantillonnage vers 32 points pour une analyse stable
     const points = resample([...rawPoints], 32);
