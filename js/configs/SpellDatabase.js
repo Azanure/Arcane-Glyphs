@@ -1,59 +1,242 @@
 export const SpellDatabase = {
-    FIREBALL: {
-        id: "FIREBALL",
-        name: "Boule de feu",
-        element: "FIRE",
-        icon: "🔥",
-        desc: "Lance un puissant projectile explosif.",
-        castType: "PROJECTILE_AOE",
-        radius: 5,
-        cooldown: 1, // Secondes
-        effects: [
-            { type: "DAMAGE", amount: 50, element: "FIRE" }
-        ]
-    },
-    ICE_AURA: {
-        id: "ICE_AURA",
-        name: "Aura de Glace",
-        element: "ICE",
-        icon: "❄️",
-        desc: "Gèle les ennemis autour de vous.",
-        castType: "AURA",
-        radius: 10,
-        cooldown: 1, // Secondes
-        effects: [
-            { type: "DAMAGE", amount: 50, element: "ICE" },
-            { type: "FREEZE", duration: 3000 }
-        ]
-    },
-    SEISMIC_WAVE: {
-        id: "SEISMIC_WAVE",
-        name: "Vague Sismique",
-        element: "EARTH",
-        icon: "s🪨",
-        desc: "Brise la terre en cône devant vous.",
-        castType: "CONE",
-        distance: 15,
-        angle: 45,
-        cooldown: 1, // Secondes
-        effects: [
-            { type: "DAMAGE", amount: 50, element: "EARTH" },
-            { type: "SLOW", duration: 3000, factor: 0.5 }
-        ]
-    },
-    WIND_GUST: {
-        id: "WIND_GUST",
-        name: "Rafale",
-        element: "AIR",
-        icon: "🌪️",
-        desc: "Repousse tous les ennemis.",
-        castType: "CONE",
-        distance: 20,
-        angle: 90,
-        cooldown: 1, // Secondes
-        effects: [
-            { type: "DAMAGE", amount: 20, element: "AIR" },
-            { type: "KNOCKBACK", force: 10 }
-        ]
-    }
+  FIREBALL: {
+    id: "FIREBALL",
+    name: "Fireball",
+    element: "FIRE",
+    icon: "assets/spells/fire/fireball.png",
+    desc: "Throws a powerful explosive projectile.",
+    castType: "PROJECTILE_AOE",
+    radius: 5,
+    cooldown: 1, // Secondes
+    effects: [{ type: "DAMAGE", amount: 50, element: "FIRE" }],
+  },
+
+  INFERNO: {
+    id: "INFERNO",
+    name: "Ocean of Flames",
+    element: "FIRE",
+    icon: "assets/spells/fire/ocean_of_flames.png",
+    desc: "Turns the ground around you into a pool of fire.",
+    castType: "AURA",
+    radius: 6,
+    cooldown: 15,
+    effects: [{ type: "DAMAGE", amount: 20, element: "FIRE" }],
+  },
+  FIRE_BOMB: {
+    id: "FIRE_BOMB",
+    name: "Fire Bomb",
+    element: "FIRE",
+    icon: "assets/spells/fire/fire-bomb.png",
+    desc: "Places an explosive bomb that triggers on enemy contact.",
+    castType: "TRAP",
+    radius: 4, // Rayon de l'explosion
+    cooldown: 3,
+    effects: [{ type: "DAMAGE", amount: 150, element: "FIRE" }],
+  },
+  FIRE_TRAIL: {
+    id: "FIRE_TRAIL",
+    name: "Blazing Trail",
+    element: "FIRE",
+    icon: "assets/spells/fire/blazing_trail.png",
+    desc: "Leaves a trail of flames behind you as you walk.",
+    castType: "TRAIL",
+    radius: 1.5, // Largeur de la piste
+    cooldown: 15,
+    duration: 5, // Dure 5 secondes
+    effects: [{ type: "DAMAGE", amount: 15, element: "FIRE" }],
+  },
+  FIRE_CONE: {
+    id: "FIRE_CONE",
+    name: "Dragon's Breath",
+    element: "FIRE",
+    icon: "assets/spells/fire/dragons_breath.png",
+    desc: "Projects a devastating cone of flames in front of you.",
+    castType: "CONE",
+    distance: 8,
+    angle: 45, // Demi-angle (90 degrés total)
+    cooldown: 5,
+    effects: [{ type: "DAMAGE", amount: 40, element: "FIRE" }],
+  },
+  ICE_AURA: {
+    id: "ICE_AURA",
+    name: "Ice Aura",
+    element: "ICE",
+    icon: "❄️",
+    desc: "Freezes enemies around you.",
+    castType: "AURA",
+    radius: 10,
+    cooldown: 1, // Secondes
+    effects: [
+      { type: "DAMAGE", amount: 50, element: "ICE" },
+      { type: "FREEZE", duration: 3000 },
+    ],
+  },
+  SEISMIC_WAVE: {
+    id: "SEISMIC_WAVE",
+    name: "Seismic Wave",
+    element: "EARTH",
+    icon: "🪨",
+    desc: "Shatters the earth in a cone in front of you.",
+    castType: "CONE",
+    distance: 15,
+    angle: 45,
+    cooldown: 1, // Secondes
+    effects: [
+      { type: "DAMAGE", amount: 50, element: "EARTH" },
+      { type: "SLOW", duration: 3000, factor: 0.5 },
+    ],
+  },
+  WIND_BLADE: {
+    id: "WIND_BLADE",
+    name: "Wind Blades",
+    element: "AIR",
+    icon: "assets/spells/air/wind_bade.png",
+    desc: "Fires a sharp air blade that damages and slightly knocks back an enemy.",
+    castType: "PROJECTILE_SINGLE",
+    cooldown: 1,
+    effects: [
+      { type: "DAMAGE", amount: 40, element: "AIR" },
+      { type: "KNOCKBACK", force: 1.5 }
+    ],
+  },
+  TORNADO: {
+    id: "TORNADO",
+    name: "Tornado",
+    element: "AIR",
+    icon: "assets/spells/air/tornado.png",
+    desc: "Summons a tornado that sucks in enemies in its path and releases them further away.",
+    castType: "PROJECTILE_TORNADO",
+    cooldown: 15,
+    effects: [
+      { type: "DAMAGE", amount: 60, element: "AIR" } // Dégâts appliqués au relâchement
+    ],
+  },
+  WIND_REPULSE: {
+    id: "WIND_REPULSE",
+    name: "Squall",
+    element: "AIR",
+    icon: "assets/spells/air/squall.png",
+    desc: "Knocks back all enemies around you in a single burst.",
+    castType: "INSTANT_AOE",
+    radius: 6,
+    cooldown: 10,
+    effects: [
+      { type: "DAMAGE", amount: 15, element: "AIR" },
+      { type: "KNOCKBACK", force: 3 }
+    ],
+  },
+  WIND_DOMAIN: {
+    id: "WIND_DOMAIN",
+    name: "Slow Zone",
+    element: "AIR",
+    icon: "assets/spells/air/slow_zone.png",
+    desc: "Creates a zone of violent winds around you that slows enemies.",
+    castType: "AURA",
+    radius: 8,
+    duration: 6,
+    cooldown: 15,
+    effects: [
+      { type: "SLOW", duration: 1000, factor: 0.5 } // Renouvelé à chaque tick par l'AURA
+    ],
+  },
+  TAILWIND: {
+    id: "TAILWIND",
+    name: "Tailwind",
+    element: "AIR",
+    icon: "assets/spells/air/tailwind.png",
+    desc: "Significantly increases your movement speed for a short time.",
+    castType: "SELF",
+    duration: 5,
+    cooldown: 10,
+    effects: [], // Géré par le behavior
+  },
+  WATER_JET: {
+    id: "WATER_JET",
+    name: "Water Jet",
+    element: "WATER",
+    icon: "💧",
+    desc: "A pressurized jet of water.",
+    castType: "PROJECTILE",
+    cooldown: 0.8,
+    effects: [{ type: "DAMAGE", amount: 30, element: "WATER" }],
+  },
+  MAGMA_SURGE: {
+    id: "MAGMA_SURGE",
+    name: "Magma Surge",
+    element: "MAGMA",
+    icon: "🌋",
+    desc: "Burns and slows enemies on the ground.",
+    castType: "AURA",
+    radius: 6,
+    cooldown: 2,
+    effects: [
+      { type: "DAMAGE", amount: 40, element: "MAGMA" },
+      { type: "SLOW", duration: 2000, factor: 0.7 },
+    ],
+  },
+  LIGHTNING_BOLT: {
+    id: "LIGHTNING_BOLT",
+    name: "Lightning Bolt",
+    element: "LIGHTNING",
+    icon: "⚡",
+    desc: "Fast and devastating strike.",
+    castType: "PROJECTILE",
+    cooldown: 0.5,
+    effects: [{ type: "DAMAGE", amount: 60, element: "LIGHTNING" }],
+  },
+  POISON_CLOUD: {
+    id: "POISON_CLOUD",
+    name: "Toxic Cloud",
+    element: "POISON",
+    icon: "🤢",
+    desc: "Continuous damage in an area.",
+    castType: "AURA",
+    radius: 8,
+    cooldown: 3,
+    effects: [{ type: "DAMAGE", amount: 15, element: "POISON" }],
+  },
+  TIME_WARP: {
+    id: "TIME_WARP",
+    name: "Time Warp",
+    element: "TIME",
+    icon: "⏳",
+    desc: "Massively slows enemies.",
+    castType: "AURA",
+    radius: 12,
+    cooldown: 5,
+    effects: [{ type: "SLOW", duration: 5000, factor: 0.2 }],
+  },
+  HOLY_LIGHT: {
+    id: "HOLY_LIGHT",
+    name: "Holy Light",
+    element: "LIGHT",
+    icon: "✨",
+    desc: "Dazzles and damages the darkness.",
+    castType: "AURA",
+    radius: 10,
+    cooldown: 2.5,
+    effects: [{ type: "DAMAGE", amount: 45, element: "LIGHT" }],
+  },
+  SPACE_BEND: {
+    id: "SPACE_BEND",
+    name: "Space Bend",
+    element: "SPACE",
+    icon: "🌌",
+    desc: "Teleports nearby enemies further away.",
+    castType: "AURA",
+    radius: 7,
+    cooldown: 4,
+    effects: [{ type: "KNOCKBACK", force: 20 }],
+  },
+  VOID_HOLE: {
+    id: "VOID_HOLE",
+    name: "Void Hole",
+    element: "VOID",
+    icon: "⚫",
+    desc: "Pulls enemies toward a point.",
+    castType: "PROJECTILE_AOE",
+    radius: 6,
+    cooldown: 6,
+    effects: [{ type: "DAMAGE", amount: 80, element: "VOID" }],
+  },
 };

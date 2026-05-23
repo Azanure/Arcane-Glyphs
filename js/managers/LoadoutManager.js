@@ -46,6 +46,13 @@ class LoadoutManager {
             return false;
         }
 
+        // On déséquipe le sort s'il est déjà assigné à une autre rune
+        for (let rId in this.runeSpells) {
+            if (this.runeSpells[rId] && this.runeSpells[rId].id === spellId) {
+                this.runeSpells[rId] = null;
+            }
+        }
+
         this.runeSpells[runeId] = spell;
         return true;
     }

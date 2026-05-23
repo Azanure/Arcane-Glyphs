@@ -30,24 +30,64 @@
 </head>
 <body>
 
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- LOADING SCREEN (affiché pendant les transitions de scènes)         -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="loadingScreen" class="hidden" style="
+        position: fixed; inset: 0; z-index: 99999;
+        background: radial-gradient(ellipse at center, #0a0a1a 0%, #000005 100%);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 32px;">
+
+        <!-- Logo / titre -->
+        <h1 style="
+            font-family: 'Press Start 2P', monospace;
+            color: #00f2ff; font-size: 1.8rem;
+            text-shadow: 0 0 20px #00f2ff, 0 0 40px #00f2ff;
+            letter-spacing: 4px; margin: 0;">
+            ARCANE GLYPHS
+        </h1>
+
+        <!-- Message dynamique -->
+        <p id="loadingLabel" style="
+            font-family: 'Press Start 2P', monospace;
+            color: #7b00ff; font-size: 0.7rem;
+            text-shadow: 0 0 10px #7b00ff;
+            margin: 0; letter-spacing: 2px;">
+            Loading...
+        </p>
+
+        <!-- Barre de progression animée (loop CSS) -->
+        <div style="width: 300px; height: 6px; background: #111; border: 1px solid #333; border-radius: 3px; overflow: hidden;">
+            <div style="
+                height: 100%; width: 40%;
+                background: linear-gradient(90deg, #7b00ff, #00f2ff, #7b00ff);
+                background-size: 200% 100%;
+                animation: loadingBar 1.2s linear infinite;
+                border-radius: 3px;">
+            </div>
+        </div>
+
+        <style>
+            @keyframes loadingBar {
+                0%   { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+        </style>
+    </div>
+
     <!-- Monde 3D et Dessin -->
     <canvas id="renderCanvas"></canvas>
     <canvas id="drawingCanvas"></canvas>
     <video id="videoElement" autoplay playsinline></video>
     
     <!-- Statut et Curseur -->
-    <div id="trackingStatus">
-        <div class="dot"></div>
-        <span id="statusText">Initialisation...</span>
-    </div>
     <div id="magicCursor" class="lost"></div>
-    <div id="gestureIndicator" class="hidden active">🤚</div>
     <div id="toastContainer"></div>
     <div id="handLostOverlay" class="overlay-container hidden">
         <div class="hand-lost-content">
-            <h2 class="pixel-subtitle alert">MAIN PERDUE</h2>
-            <p>REPLACEZ VOTRE MAIN DANS LE CHAMP DE LA CAMÉRA POUR CONTINUER</p>
-            <div class="hand-icon-anim">🤚</div>
+            <h2 class="pixel-subtitle alert">HAND LOST</h2>
+            <p>PLACE YOUR HAND BACK IN THE CAMERA VIEW TO CONTINUE</p>
         </div>
     </div>
 
@@ -59,48 +99,77 @@
                 <button id="btnNewGame" class="voxel-btn">NEW GAME</button>
                 <button id="btnContinue" class="voxel-btn" disabled>CONTINUE</button>
                 <button id="btnSettings" class="voxel-btn">SETTINGS</button>
-                <button id="btnCredits" class="voxel-btn">CREDITS</button>
-                <button id="btnQuit" class="voxel-btn">QUIT</button>
+                <button id="btnHowToPlay" class="voxel-btn">HOW TO PLAY</button>
             </div>
         </div>
     </div>
 
-    <!-- PANNEAU SETTINGS -->
+    <!-- PANNEAU SETTINGS (Hub) -->
     <div id="settingsPanel" class="overlay-container hidden">
-        <div class="panel-content voxel-box">
-            <h2 class="pixel-subtitle">SETTINGS</h2>
+        <div class="panel-content voxel-box pause-panel" style="min-width:420px;">
+            <h2 class="pixel-subtitle" style="color:#00f2ff; font-size:1.4rem; margin-bottom:36px;">⚙ SETTINGS</h2>
+
+            <!-- Volume -->
             <div class="setting-item">
-                <label for="musicVolume">Volume Musique</label>
-                <input type="range" id="musicVolume" min="0" max="100" value="70">
+                <label for="hubVolumeSlider" style="color:#aaa; font-size:0.65rem; margin-bottom:10px; display:block;">
+                    🔊 VOLUME — <span id="hubVolumeValue">80%</span>
+                </label>
+                <input type="range" id="hubVolumeSlider"
+                    min="0" max="1" step="0.01" value="0.8"
+                    style="width:100%; accent-color:#7b00ff; height:6px; cursor:pointer;">
             </div>
+
+            <!-- Clavier -->
             <div class="setting-item">
-                <label for="mouseSensitivity">Sensibilité Souris</label>
-                <input type="range" id="mouseSensitivity" min="1" max="10" value="5">
+                <label style="color:#aaa; font-size:0.65rem; margin-bottom:14px; display:block;">⌨ KEYBOARD LAYOUT</label>
+                <div style="display:flex; gap:16px; justify-content:center;">
+                    <button id="hubBtnQwerty" class="voxel-btn small layout-btn active-layout">QWERTY<br><span style="font-size:0.5em; opacity:0.7;">W A S D</span></button>
+                    <button id="hubBtnAzerty" class="voxel-btn small layout-btn">AZERTY<br><span style="font-size:0.5em; opacity:0.7;">Z Q S D</span></button>
+                </div>
             </div>
-            <button id="btnCloseSettings" class="voxel-btn small">RETOUR</button>
+
+            <button id="btnCloseSettings" class="voxel-btn small" style="margin-top:10px; background:#2a2a5a;">← BACK</button>
         </div>
     </div>
 
-    <!-- PANNEAU CREDITS -->
-    <div id="creditsPanel" class="overlay-container hidden">
-        <div class="panel-content voxel-box">
-            <h2 class="pixel-subtitle">CREDITS</h2>
-            <div class="credits-text">
-                <p>Créé par :</p>
-                <p>L'équipe Arcane-Glyphs</p>
-                <p>Propulsé par Babylon.js</p>
+    <!-- PANNEAU HOW TO PLAY -->
+    <div id="howToPlayPanel" class="overlay-container hidden">
+        <div class="panel-content voxel-box" style="max-width: 600px; text-align: left;">
+            <h2 class="pixel-subtitle" style="text-align: center; color: #00f2ff;">HOW TO PLAY</h2>
+            <div class="credits-text" style="font-size: 0.8rem; line-height: 1.6; margin-bottom: 20px;">
+                <p><b>Movement:</b> Use ZQSD (or WASD) to move.</p>
+                <p><b>Combat:</b></p>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>Pinch your index finger and thumb together in front of the camera to draw symbols on the screen.</li>
+                    <li>Release the pinch to cast the spell matching the symbol (e.g., V for projectile, Circle for AoE, etc.).</li>
+                </ul>
+                <p><b>Hub:</b> Use your mouse to interact with the UI. Choose your spells at the preparation altar. You must equip a spell to cast it in the level.</p>
+                <p><b>Pause:</b> Press [ESCAPE] at any time to pause the game.</p>
             </div>
-            <button id="btnCloseCredits" class="voxel-btn small">RETOUR</button>
+            <div style="text-align: center;">
+                <button id="btnCloseHowToPlay" class="voxel-btn small">BACK</button>
+            </div>
         </div>
     </div>
 
     <!-- MODALE DE CONFIRMATION -->
     <div id="confirmModal" class="overlay-container hidden">
         <div class="modal-content voxel-box">
-            <p>Attention, une partie existe déjà. Voulez-vous tout effacer et recommencer ?</p>
+            <p>Warning, a save file already exists. Do you want to erase everything and start over?</p>
             <div class="modal-buttons">
-                <button id="btnConfirmNew" class="voxel-btn small alert">OUI</button>
-                <button id="btnCancelNew" class="voxel-btn small">NON</button>
+                <button id="btnConfirmNew" class="voxel-btn small alert">YES</button>
+                <button id="btnCancelNew" class="voxel-btn small">NO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE D'ERREUR -->
+    <div id="errorModal" class="overlay-container hidden" style="z-index: 10000;">
+        <div class="modal-content voxel-box" style="border-color: #ff3333; box-shadow: 0 0 20px #ff3333;">
+            <h2 style="color: #ff3333; margin-top:0;">ERROR</h2>
+            <p id="errorModalMessage">You must equip at least one spell!</p>
+            <div class="modal-buttons">
+                <button onclick="document.getElementById('errorModal').classList.add('hidden')" class="voxel-btn small alert">OK</button>
             </div>
         </div>
     </div>
@@ -116,10 +185,49 @@
             <div id="xpText" class="bar-text">Level 1 - XP: 0/10</div>
         </div>
         <div id="aiDirectorUI">
-            <div><strong>AI Spawn Chances:</strong></div>
-            <div style="color: #ff4444;" id="probFire">Fire: 33%</div>
-            <div style="color: #44aaff;" id="probIce">Ice: 33%</div>
-            <div style="color: #55cc55;" id="probEarth">Earth: 33%</div>
+            <div><strong>Enemy Resistances:</strong></div>
+            <div id="resistanceList">
+                <!-- Dynamically populated in js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SCORE & TIMER (Top Middle) -->
+    <div id="hudScoreTimer" class="hidden" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; font-family: 'Press Start 2P', monospace; text-shadow: 2px 2px 0px #000; pointer-events: none; z-index: 100;">
+        <div id="timerText" style="color: #00f2ff; font-size: 1.5rem; margin-bottom: 8px;">00:00</div>
+        <div id="scoreText" style="color: #ffaa00; font-size: 1.0rem;">Score: 0</div>
+    </div>
+
+    <!-- FPS DEBUG (Top Right) -->
+    <div id="fpsDebug" class="hidden" style="position: fixed; top: 20px; right: 20px; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 0.8rem; text-shadow: 2px 2px 0px #000; pointer-events: none; z-index: 100;">
+        FPS: 60
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameOverScreen" class="overlay-container hidden" style="background-color: rgba(10, 10, 20, 0.95);">
+        <div class="panel-content voxel-box" style="min-width: 400px; text-align: center;">
+            <h1 class="pixel-title alert" style="font-size: 2.5rem; margin-bottom: 10px;">GAME OVER</h1>
+            <h2 id="finalTimeText" style="color: #00f2ff; font-family: 'Press Start 2P', monospace; font-size: 1.2rem; margin-bottom: 10px;">Time: 00:00</h2>
+            <h2 id="finalScoreText" style="color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 1.2rem; margin-bottom: 30px;">Score: 0</h2>
+
+            <!-- LEADERBOARD -->
+            <div style="background: rgba(0,0,0,0.5); padding: 10px; border-radius: 4px; border: 1px solid #444; margin-bottom: 20px; max-height: 200px; overflow-y: auto;">
+                <h3 class="pixel-subtitle" style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px;">-- TOP SCORES --</h3>
+                <table id="leaderboardTable" style="width: 100%; font-size: 0.8rem; text-align: left; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #555; color: #7b00ff;">
+                            <th style="padding: 5px;">Rank</th>
+                            <th style="padding: 5px;">Time</th>
+                            <th style="padding: 5px;">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button id="btnGameOverReturn" class="voxel-btn pulse-glow">RETURN TO HUB</button>
         </div>
     </div>
 
@@ -146,7 +254,7 @@
                     <!-- Généré dynamiquement en JS -->
                 </div>
                 
-                <p class="hint-text">Glissez des sorts sur les runes.</p>
+                <p class="hint-text">Drag spells onto the runes.</p>
             </div>
 
             <!-- PANNEAU DROITE: ASTROLABE / DETAIL (2/3) -->
@@ -163,11 +271,11 @@
                 <div id="elementDetailView" class="hidden">
                     <div class="detail-header">
                         <button id="btnBackToAstrolabe" class="voxel-btn small">◀ ASTROLABE</button>
-                        <h2 class="pixel-subtitle" id="detailElementName">FEU</h2>
+                        <h2 class="pixel-subtitle" id="detailElementName">FIRE</h2>
                     </div>
                     
                     <div class="detail-content">
-                        <button id="btnEquipElement" class="voxel-btn pulse-glow">ÉQUIPER CET ÉLÉMENT</button>
+                        <button id="btnEquipElement" class="voxel-btn pulse-glow">EQUIP THIS ELEMENT</button>
                         <div class="spells-list-container" id="elementSpellsList">
                             <!-- Sorts de l'élément (Draggables) -->
                         </div>
@@ -183,7 +291,7 @@
         <!-- Header: Nom du persnnage -->
         <div class="carousel-header">
             <h1 id="carouselCharName" class="pixel-title" style="margin-bottom: 0.5rem; text-shadow: 2px 2px 0px #000, 4px 4px 0px #7b00ff;">AZIR</h1>
-            <h3 id="carouselCharClass" style="color: #00f2ff; margin: 0; text-shadow: 2px 2px 0px #000;">Mage de Sable</h3>
+            <h3 id="carouselCharClass" style="color: #00f2ff; margin: 0; text-shadow: 2px 2px 0px #000;">Sand Mage</h3>
         </div>
 
         <!-- Flèches de navigation -->
@@ -195,43 +303,26 @@
         <!-- Footer: Stats, Bouton Jouer et Cadenas -->
         <div class="carousel-footer">
             <div id="carouselStats" class="stats-container voxel-box">
-                <div class="stat-row">
-                    <span class="stat-label">Force</span>
-                    <div class="stat-bar-bg"><div id="statForce" class="stat-bar-fill" style="width: 20%; background: #ff3333;"></div></div>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Vitesse</span>
-                    <div class="stat-bar-bg"><div id="statVitesse" class="stat-bar-fill" style="width: 50%; background: #33cc33;"></div></div>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">Magie</span>
-                    <div class="stat-bar-bg"><div id="statMagie" class="stat-bar-fill" style="width: 90%; background: #00f2ff;"></div></div>
-                </div>
+                <p id="charBonusText" style="color: #ffaa00; text-align: center; font-size: 1.1rem; margin: 0; padding: 10px; font-weight: bold;"></p>
             </div>
             
             <div id="carouselLockBanner" class="lock-banner hidden">
-                Condition : <span id="carouselLockCondition">Atteindre le niveau 5</span>
+                Requirement: <span id="carouselLockCondition">Reach level 5</span>
             </div>
 
-            <button id="btnPlayCharacter" class="voxel-btn pulse-glow">CHOISIR</button>
-            <button id="btnQuitCarousel" class="voxel-btn small" style="margin-top: 15px; background: #333;">RETOUR</button>
+            <button id="btnPlayCharacter" class="voxel-btn pulse-glow">SELECT</button>
+            <button id="btnQuitCarousel" class="voxel-btn small" style="margin-top: 15px; background: #333;">BACK</button>
         </div>
     </div>
 
     <!-- HUD SPELLS COOLDOWN -->
-    <div id="hudSpells" class="hidden" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 10;">
-        <div class="hud-slot voxel-slot" id="hud-cercle" data-key="O">
-            <div class="hud-needle"></div>
-            <span class="hud-spell-name"></span>
-        </div>
-        <div class="hud-slot voxel-slot" id="hud-ligne" data-key="—">
-            <div class="hud-needle"></div>
-            <span class="hud-spell-name"></span>
-        </div>
-        <div class="hud-slot voxel-slot" id="hud-triangle" data-key="Δ">
-            <div class="hud-needle"></div>
-            <span class="hud-spell-name"></span>
-        </div>
+    <div id="hudSpells" class="hidden" style="position: absolute; top: 20px; right: 20px; display: grid; grid-template-columns: repeat(3, auto); gap: 10px; z-index: 10; pointer-events: none;">
+        <!-- Généré dynamiquement en JS -->
+    </div>
+
+    <!-- INTERACTION PROMPT -->
+    <div id="interactionPrompt" class="hidden" style="position:absolute; bottom:25%; left:50%; transform:translateX(-50%); font-family:'Press Start 2P', monospace; font-size:16px; color:#00f2ff; text-shadow:2px 2px 0px #000; z-index: 100; pointer-events:none;">
+        PRESS [E] TO CHOOSE SPELLS
     </div>
 
     <div id="levelUpScreen" class="overlay-container hidden">
@@ -255,7 +346,69 @@
                     <div class="card-description"></div>
                 </div>
             </div>
-            <p style="margin-top: 40px; color: #00f2ff; font-size: 0.8rem;">Pincez pour bouger le curseur, puis faites un [POUCE EN L'AIR] pour choisir.</p>
+            <p style="margin-top: 40px; color: #00f2ff; font-size: 0.8rem;">Pinch to move the cursor, then do a [THUMBS UP] to select.</p>
+        </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- MENU PAUSE                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="pauseMenuOverlay" class="overlay-container hidden" style="backdrop-filter: blur(12px); background: rgba(0,0,0,0.75);">
+        <div class="modal-content voxel-box pause-panel">
+            <h2 class="pixel-subtitle" style="color:#00f2ff; font-size:1.6rem; margin-bottom:36px; letter-spacing:3px;">PAUSE</h2>
+            <div class="button-list">
+                <button id="pauseBtnResume" class="voxel-btn">▶ RESUME</button>
+                <button id="pauseBtnSettings" class="voxel-btn" style="background:#2a2a5a;">⚙ SETTINGS</button>
+                <button id="pauseBtnReturn" class="voxel-btn alert">✕ QUIT</button>
+            </div>
+            <p style="margin-top:28px; color:#555; font-size:0.55rem;">Press ESCAPE to resume</p>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- PAGE SETTINGS                                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="settingsOverlay" class="overlay-container hidden" style="backdrop-filter: blur(12px); background: rgba(0,0,0,0.80);">
+        <div class="modal-content voxel-box pause-panel" style="min-width:420px;">
+            <h2 class="pixel-subtitle" style="color:#00f2ff; font-size:1.4rem; margin-bottom:36px;">⚙ SETTINGS</h2>
+
+            <!-- Volume -->
+            <div class="setting-item">
+                <label for="settingsVolumeSlider" style="color:#aaa; font-size:0.65rem; margin-bottom:10px; display:block;">
+                    🔊 VOLUME — <span id="settingsVolumeValue">80%</span>
+                </label>
+                <input type="range" id="settingsVolumeSlider"
+                    min="0" max="1" step="0.01" value="0.8"
+                    style="width:100%; accent-color:#7b00ff; height:6px; cursor:pointer;">
+            </div>
+
+            <!-- Clavier -->
+            <div class="setting-item">
+                <label style="color:#aaa; font-size:0.65rem; margin-bottom:14px; display:block;">⌨ KEYBOARD LAYOUT</label>
+                <div style="display:flex; gap:16px; justify-content:center;">
+                    <button id="settingsBtnQwerty" class="voxel-btn small layout-btn active-layout">QWERTY<br><span style="font-size:0.5em; opacity:0.7;">W A S D</span></button>
+                    <button id="settingsBtnAzerty" class="voxel-btn small layout-btn">AZERTY<br><span style="font-size:0.5em; opacity:0.7;">Z Q S D</span></button>
+                </div>
+            </div>
+
+            <button id="settingsBtnBack" class="voxel-btn small" style="margin-top:10px; background:#2a2a5a;">← BACK</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- POPUP CONFIRMATION QUITTER                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="confirmReturnOverlay" class="overlay-container hidden" style="backdrop-filter: blur(16px); background: rgba(0,0,0,0.88); z-index:200;">
+        <div class="modal-content voxel-box" style="min-width:360px; max-width:480px;">
+            <h2 style="color:#ff4444; font-size:1rem; margin-bottom:16px; font-family:'Press Start 2P',monospace;">QUIT?</h2>
+            <p style="color:#ccc; font-size:0.6rem; margin-bottom:32px; line-height:1.8;">
+                Your progress will be lost.<br>Are you sure you want to return to the Hub?
+            </p>
+            <div style="display:flex; gap:20px; justify-content:center;">
+                <button id="confirmBtnYes" class="voxel-btn alert" style="padding:12px 28px;">YES, QUIT</button>
+                <button id="confirmBtnNo" class="voxel-btn small" style="background:#2a2a5a; padding:12px 28px;">CANCEL</button>
+            </div>
         </div>
     </div>
 
@@ -268,8 +421,6 @@
         </div>
     </div>
 
-    <!-- Script principal du projet (Module) -->
     <script type="module" src="js/main.js"></script>
-    <div id="debugCoord" style="position: absolute; top: 10px; left: 10px; color: yellow; background: rgba(0,0,0,0.5); padding: 5px; font-family: monospace; z-index: 1000; pointer-events: none;"></div>
 </body>
 </html>

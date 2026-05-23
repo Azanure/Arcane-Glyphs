@@ -4,7 +4,8 @@
     gap: 30px;
     width: 90%;
     max-width: 1400px;
-    height: 80vh;
+    min-height: 80vh;
+    height: auto;
     margin: auto;
 }
 
@@ -65,10 +66,11 @@
 /* RUNE GRID */
 .rune-grid-container {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-gap: 15px;
+    grid-template-columns: repeat(4, 90px);
+    justify-content: center;
+    grid-gap: 20px;
     flex-grow: 1;
-    overflow-y: auto;
+    overflow-y: visible;
     padding: 10px;
 }
 
@@ -85,11 +87,12 @@
 }
 
 /* La forme de la rune s'affiche en filigrane (background) */
-.rune-slot::before {
-    content: attr(data-trace);
+.rune-trace-image {
     position: absolute;
-    font-size: 3rem;
-    color: rgba(255, 255, 255, 0.1);
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
+    opacity: 0.25; /* Slightly increased so the image shows well */
     z-index: 1;
     pointer-events: none;
 }
@@ -154,9 +157,15 @@ body.is-dragging-spell .rune-slot.drag-hover {
     color: #fff;
 }
 
-.astrolabe-node:hover {
+.astrolabe-node:not(.locked):hover {
     transform: scale(1.15);
     z-index: 10;
+}
+
+.astrolabe-node.locked {
+    cursor: not-allowed;
+    background: #111;
+    opacity: 0.6;
 }
 
 /* DETAIL VIEW */
@@ -213,6 +222,11 @@ body.is-dragging-spell .rune-slot.drag-hover {
 
 .spell-card-icon {
     font-size: 3rem;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .spell-card-name {

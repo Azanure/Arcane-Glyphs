@@ -5,19 +5,20 @@ export class InfiniteMap {
     constructor(scene) {
         this.scene = scene;
         this.activeChunks = new Map();
-        this.noiseGen = new LakeGenerator(42); // Seed globale demandée
-        this.pitGen = new PitGenerator(42);   // Nouveau générateur de trous
-        this.renderDistance = 2; // Nombre de chunks autour du joueur
-        
+        // Utiliser la seed du niveau pour un terrain déterministe
+        const seed = window.levelSeed ?? 42;
+        this.noiseGen = new LakeGenerator(seed);
+        this.pitGen = new PitGenerator(seed);
+        this.renderDistance = 1;
+
         this.lastPlayerChunkX = -999;
         this.lastPlayerChunkZ = -999;
 
-        // --- SOL DE SÉCURITÉ ---
-        // Une grande plaque invisible qui suit le joueur pour empêcher de tomber
-        this.safetyFloor = BABYLON.MeshBuilder.CreateGround("safetyFloor", { width: 100, height: 100 }, this.scene);
-        this.safetyFloor.isVisible = false; 
-        this.safetyFloor.checkCollisions = true; 
-        this.safetyFloor.position.y = -0.05; 
+        // Exposer globalement pour la détection lave/trou O(1) dans Player.js et Enemy.js
+        window.terrainNoiseGen = this.noiseGen;
+        window.terrainPitGen = this.pitGen;
+
+        this.chunkQueue = [];
     }
 
     /**
@@ -26,7 +27,7 @@ export class InfiniteMap {
     ensureSafeSpawn(player) {
         let px = Math.floor(player.mesh.position.x / TILE_SIZE);
         let pz = Math.floor(player.mesh.position.z / TILE_SIZE);
-        
+
         // Scan en spirale autour de la position actuelle pour trouver du SOL
         const range = 15;
         for (let r = 0; r < range; r++) {
@@ -34,15 +35,15 @@ export class InfiniteMap {
                 for (let dz = -r; dz <= r; dz++) {
                     const worldX = px + dx;
                     const worldZ = pz + dz;
-                    
+
                     // On simule getNoiseAt sans instancier le chunk
                     const isLava = this.noiseGen.isLava(worldX, worldZ);
                     const isPit = this.pitGen.isPit(worldX, worldZ);
-                    
+
                     if (!isLava && !isPit) {
                         player.mesh.position.x = worldX * TILE_SIZE + (TILE_SIZE / 2);
                         player.mesh.position.z = worldZ * TILE_SIZE + (TILE_SIZE / 2);
-                        player.mesh.position.y = 1.0; 
+                        player.mesh.position.y = 1.5; // Le sol est à Y=1, on spawn juste un peu au dessus pour tomber dessus proprement
                         console.log(`[SPAWN] Position safe trouvée à : ${player.mesh.position}`);
                         return;
                     }
@@ -54,19 +55,49 @@ export class InfiniteMap {
     update(playerPosition) {
         // En vrai taille d'un chunk, TILE_SIZE * CHUNK_SIZE = 32
         const chunkSizeWorld = CHUNK_SIZE * TILE_SIZE;
-        
-        let pChunkX = Math.floor(playerPosition.x / chunkSizeWorld);
-        let pChunkZ = Math.floor(playerPosition.z / chunkSizeWorld);
 
-        // Si le joueur est resté dans le même chunk, on ne recalcule rien
+        let pChunkX = this.lastPlayerChunkX;
+        let pChunkZ = this.lastPlayerChunkZ;
+
+        // --- OPTIMISATION COLLISIONS (Étape 2) ---
+        // On le fait à chaque frame pour activer/désactiver les collisions au plus proche (rayon de 15m)
+        for (let [key, chunk] of this.activeChunks) {
+            chunk.updateCollisions(playerPosition, 15);
+        }
+
+        // --- GÉNÉRATION PROGRESSIVE (1 chunk par frame pour éviter les lag spikes) ---
+        if (this.chunkQueue.length > 0) {
+            let key = this.chunkQueue.shift();
+            // Double vérification si on en a toujours besoin
+            if (!this.activeChunks.has(key)) {
+                let parts = key.split('_');
+                let cx = parseInt(parts[0]);
+                let cz = parseInt(parts[1]);
+                let newChunk = new TerrainChunk(cx, cz, this.noiseGen, this.pitGen, this.scene);
+                this.activeChunks.set(key, newChunk);
+            }
+        }
+
+        // --- HYSTÉRÉSIS (Zone tampon de 20m) ---
+        // Évite le "thrashing" aux frontières de chunk
+        let currentCenterX = (this.lastPlayerChunkX * chunkSizeWorld) + (chunkSizeWorld / 2);
+        let currentCenterZ = (this.lastPlayerChunkZ * chunkSizeWorld) + (chunkSizeWorld / 2);
+
+        let distToCenterSq =
+            Math.pow(playerPosition.x - currentCenterX, 2) +
+            Math.pow(playerPosition.z - currentCenterZ, 2);
+
+        // Si c'est le tout premier appel ou si on est sorti de la zone sécurisée (20m)
+        if (this.lastPlayerChunkX === -999 || distToCenterSq > Math.pow(20.0, 2)) {
+            pChunkX = Math.floor(playerPosition.x / chunkSizeWorld);
+            pChunkZ = Math.floor(playerPosition.z / chunkSizeWorld);
+        }
+
+        // Si le joueur est resté dans la zone sécurisée, on ne recalcule pas la génération
         if (pChunkX === this.lastPlayerChunkX && pChunkZ === this.lastPlayerChunkZ) return;
 
         this.lastPlayerChunkX = pChunkX;
         this.lastPlayerChunkZ = pChunkZ;
-
-        // Le sol de sécurité suit le joueur
-        this.safetyFloor.position.x = pChunkX * chunkSizeWorld;
-        this.safetyFloor.position.z = pChunkZ * chunkSizeWorld;
 
         let neededChunks = [];
 
@@ -86,14 +117,10 @@ export class InfiniteMap {
             }
         }
 
-        // Générer les nouveaux chunks
+        // Générer les nouveaux chunks (ajout à la file d'attente)
         for (let key of neededChunks) {
-            if (!this.activeChunks.has(key)) {
-                let parts = key.split('_');
-                let cx = parseInt(parts[0]);
-                let cz = parseInt(parts[1]);
-                let newChunk = new TerrainChunk(cx, cz, this.noiseGen, this.pitGen, this.scene);
-                this.activeChunks.set(key, newChunk);
+            if (!this.activeChunks.has(key) && !this.chunkQueue.includes(key)) {
+                this.chunkQueue.push(key);
             }
         }
     }

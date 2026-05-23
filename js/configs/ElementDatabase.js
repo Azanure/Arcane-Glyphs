@@ -1,45 +1,81 @@
 export const ElementDatabase = {
-    // === ÉLÉMENTS PRIMORDIAUX ===
-    FIRE: {
-        id: "FIRE", name: "Feu", type: "PRIMORDIAL", color: "#ff4444"
-    },
-    ICE: {
-        id: "ICE", name: "Glace", type: "PRIMORDIAL", color: "#44aaff"
-    },
-    EARTH: {
-        id: "EARTH", name: "Terre", type: "PRIMORDIAL", color: "#66aa44"
-    },
-    AIR: {
-        id: "AIR", name: "Air", type: "PRIMORDIAL", color: "#dddddd"
-    },
-    
-    // === ÉLÉMENTS DE FUSION ===
-    LAVA: {
-        id: "LAVA", name: "Lave", type: "FUSION", color: "#ff8800", parents: ["FIRE", "EARTH"]
-    },
-    STORM: {
-        id: "STORM", name: "Tempête", type: "FUSION", color: "#00eeee", parents: ["AIR", "ICE"]
-    },
-    SAND: {
-        id: "SAND", name: "Sable", type: "FUSION", color: "#ddcc88", parents: ["EARTH", "AIR"]
-    },
-    FROSTFIRE: {
-        id: "FROSTFIRE", name: "Givrefeu", type: "FUSION", color: "#ff00ff", parents: ["FIRE", "ICE"]
-    },
+  // === ÉLÉMENTS PRIMORDIAUX ===
+  FIRE: {
+    id: "FIRE",
+    name: "Fire",
+    type: "PRIMORDIAL",
+    color: "#ff4444",
+  },
+  ICE: {
+    id: "ICE",
+    name: "Ice",
+    type: "PRIMORDIAL",
+    color: "#44aaff",
+  },
+  EARTH: {
+    id: "EARTH",
+    name: "Earth",
+    type: "PRIMORDIAL",
+    color: "#66aa44",
+  },
+  AIR: {
+    id: "AIR",
+    name: "Air",
+    type: "PRIMORDIAL",
+    color: "#dddddd",
+  },
 
-    // === ÉLÉMENTS ÉSOTÉRIQUES ===
-    VOID: {
-        id: "VOID", name: "Vide", type: "ESOTERIC", color: "#440088"
-    },
-    LIGHT: {
-        id: "LIGHT", name: "Lumière", type: "ESOTERIC", color: "#ffffaa"
-    },
-    TIME: {
-        id: "TIME", name: "Temps", type: "ESOTERIC", color: "#00ffcc"
-    },
-    SPACE: {
-        id: "SPACE", name: "Espace", type: "ESOTERIC", color: "#000000" // Avec ombre portée
-    }
+  // === ÉLÉMENTS ÉLÉMENTAIRES ===
+  WATER: {
+    id: "WATER",
+    name: "Water",
+    type: "ELEMENTARY",
+    color: "#2255ff",
+  },
+  MAGMA: {
+    id: "MAGMA",
+    name: "Magma",
+    type: "ELEMENTARY",
+    color: "#ff8800",
+  },
+  LIGHTNING: {
+    id: "LIGHTNING",
+    name: "Lightning",
+    type: "ELEMENTARY",
+    color: "#ffff00",
+  },
+  POISON: {
+    id: "POISON",
+    name: "Poison",
+    type: "ELEMENTARY",
+    color: "#88ff22",
+  },
+
+  // === ÉLÉMENTS ÉSOTÉRIQUES ===
+  TIME: {
+    id: "TIME",
+    name: "Time",
+    type: "ESOTERIC",
+    color: "#00ffcc",
+  },
+  LIGHT: {
+    id: "LIGHT",
+    name: "Light",
+    type: "ESOTERIC",
+    color: "#ffffaa",
+  },
+  SPACE: {
+    id: "SPACE",
+    name: "Space",
+    type: "ESOTERIC",
+    color: "#aa66ff",
+  },
+  VOID: {
+    id: "VOID",
+    name: "Void",
+    type: "ESOTERIC",
+    color: "#440088",
+  },
 };
 
 window.ElementDatabase = ElementDatabase;

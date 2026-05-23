@@ -1,4 +1,8 @@
 /* Reset et style global */
+.hidden {
+    display: none !important;
+}
+
 body, html {
     margin: 0;
     padding: 0;
@@ -9,10 +13,6 @@ body, html {
     font-family: 'Press Start 2P', cursive;
     user-select: none;
     color: #fff;
-}
-
-.hidden {
-    display: none !important;
 }
 
 /* Canvas Babylon.js pour le monde 3D en plein écran */
@@ -109,6 +109,8 @@ body, html {
         /* L'élément HTML représentant le stylo imaginaire / curseur magique */
         #magicCursor {
             position: absolute;
+            top: -100px;
+            left: -100px;
             width: 24px;
             height: 24px;
             background-color: rgba(0, 255, 255, 0.8);
@@ -123,10 +125,8 @@ body, html {
 
         /* État quand on perd la main */
         #magicCursor.lost {
-            opacity: 0.3;
-            transform: translate(-50%, -50%) scale(0.5);
-            background-color: rgba(255, 255, 255, 0.2);
-            box-shadow: none;
+            opacity: 0;
+            display: none;
         }
 
 /* Style spécifique quand le joueur "pince" pour dessiner */
@@ -428,6 +428,9 @@ input[type=range]::-webkit-slider-thumb {
     top: 2px;
     right: 4px;
     font-size: 0.6rem;
+}
+.hud-infini-slot::after {
+    transform: rotate(90deg);
 }
 
 .spell-item {
@@ -749,4 +752,52 @@ input[type=range]::-webkit-slider-thumb {
     0% { box-shadow: 0 0 10px #7b00ff; }
     50% { box-shadow: 0 0 30px #00f2ff; }
     100% { box-shadow: 0 0 10px #7b00ff; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAUSE MENU & SETTINGS
+   ══════════════════════════════════════════════════════════════════════ */
+
+.pause-panel {
+    min-width: 320px;
+    animation: pauseFadeIn 0.2s ease;
+}
+
+@keyframes pauseFadeIn {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.layout-btn {
+    min-width: 110px;
+    transition: all 0.15s;
+    opacity: 0.55;
+    background: #1a1a3a;
+}
+
+.layout-btn.active-layout {
+    opacity: 1;
+    background: #7b00ff;
+    box-shadow: inset -4px -4px 0px 0px #3a007a, 4px 4px 0px 0px #000, 0 0 18px rgba(123,0,255,0.6);
+}
+
+#settingsVolumeSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(to right, #7b00ff, #00f2ff);
+    border-radius: 4px;
+    outline: none;
+    height: 6px;
+    width: 100%;
+}
+
+#settingsVolumeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 0 6px #7b00ff;
+    cursor: pointer;
 }

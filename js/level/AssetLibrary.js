@@ -4,6 +4,16 @@ export class AssetLibrary {
         this.isLoaded = false;
     }
 
+    /**
+     * Réinitialise la bibliothèque pour permettre le rechargement dans une nouvelle scène.
+     * Appelé par LevelScene avant chaque init().
+     */
+    reset() {
+        this.meshes = new Map();
+        this.isLoaded = false;
+        console.log('[AssetLibrary] Réinitialisée.');
+    }
+
     async load(scene) {
         if (this.isLoaded) return;
         
@@ -27,11 +37,11 @@ export class AssetLibrary {
                 mesh.isPickable = false;
                 
                 this.meshes.set(mesh.name, mesh);
-                console.log(`[ASSETS] Tile chargée : ${mesh.name}`);
+                // console.log(`[ASSETS] Tile chargée : ${mesh.name}`);
             }
             
             this.isLoaded = true;
-            console.log("[ASSETS] Chargement terminé.");
+            // console.log("[ASSETS] Chargement terminé.");
         } catch (e) {
             console.error("[ASSETS] Erreur lors du chargement de lava_world.glb", e);
         }

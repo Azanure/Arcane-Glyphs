@@ -58,14 +58,19 @@ export class SpellManager {
         }
     }
 
-    castSpell(spellConfig, player, enemies) {
+    castSpell(spellConfig, player, enemies, targetDirection = null) {
         // Enregistrer l'utilisation de l'élément par le joueur pour l'IA
-        if (spellConfig.element) {
-            player.recordSpellUsage(spellConfig.element);
-        } else {
-            // Optionnel : si on considère l'effet "dmg" ou les sous-effets
-            let primaryElement = spellConfig.effects[0] ? spellConfig.effects[0].element : "NONE";
-            player.recordSpellUsage(primaryElement || "NONE");
+        let castElement = spellConfig.element || (spellConfig.effects[0] ? spellConfig.effects[0].element : "NONE");
+        player.recordSpellUsage(castElement);
+
+        if (castElement !== "NONE" && window.globalResistances && window.globalResistances[castElement] !== undefined) {
+            window.globalResistances[castElement] = Math.min(1.0, window.globalResistances[castElement] + 0.01);
+            Object.keys(window.globalResistances).forEach(el => {
+                if (el !== castElement) {
+                    window.globalResistances[el] = Math.max(0.0, window.globalResistances[el] - 0.02);
+                }
+            });
+            if (window.updateResistanceUI) window.updateResistanceUI();
         }
 
         // Trouver la cible requise pour certains sorts
@@ -82,45 +87,42 @@ export class SpellManager {
                 player, 
                 enemies, 
                 target, 
-                this.applyEffects.bind(this)
+                (enemy, effects) => this.applyEffects(enemy, effects, spellConfig, player),
+                targetDirection
             );
         } else {
             console.warn(`Comportement inconnu pour le sort: ${spellConfig.castType}`);
         }
     }
 
-    applyEffects(enemy, effects) {
+    applyEffects(enemy, effects, spellConfig, player) {
+        let playerDamage = player ? player.damage : 0;
+        let damageMult = spellConfig.damageMult || 1;
+
+        if (player && player.selectedCharacterName) {
+            const charName = player.selectedCharacterName.toLowerCase();
+            if (charName === 'brand' && spellConfig.element === 'FIRE') {
+                damageMult *= 1.5;
+            } else if (charName === 'azir' && spellConfig.element === 'AIR') {
+                damageMult *= 1.5;
+            }
+        }
+
         for (let baseEffect of effects) {
+            let res = 0;
+            if (baseEffect.element && window.globalResistances) {
+                res = window.globalResistances[baseEffect.element] || 0;
+            }
+
             if (baseEffect.type === "DAMAGE") {
-                let dmg = baseEffect.amount;
-                let elem = baseEffect.element;
-                let shouldDamage = true;
-
-                if (elem === "FIRE") {
-                    if (enemy.elementType === "fire") dmg = 0;
-                    else if (enemy.elementType === "earth") dmg *= 0.5;
-                } else if (elem === "ICE") {
-                    if (enemy.elementType === "ice") {
-                        enemy.heal(dmg * 0.2); // Original was 10 heal for 50 damage
-                        shouldDamage = false;
-                    } else if (enemy.elementType === "fire") {
-                        dmg *= 0.5; // Original was 25 dmg for 50 damage
-                    }
-                } else if (elem === "EARTH") {
-                    if (enemy.elementType === "earth") dmg *= 0.5;
-                    else if (enemy.elementType === "ice") dmg *= 0.2; // Original was 10 dmg for 50 damage
-                }
-
-                if (shouldDamage && dmg > 0) enemy.takeDamage(dmg);
+                let dmg = (baseEffect.amount + playerDamage) * damageMult * (1 - res);
+                if (dmg > 0) enemy.takeDamage(dmg);
             } else if (baseEffect.type === "FREEZE") {
-                if (enemy.elementType !== 'ice') {
-                    enemy.applyFreeze(baseEffect.duration);
-                }
+                let duration = baseEffect.duration * (1 - res);
+                if (duration > 0) enemy.applyFreeze(duration);
             } else if (baseEffect.type === "SLOW") {
-                if (enemy.elementType !== 'earth') {
-                    // Original didn't specifically read factor natively but it was hardcoded or implemented in applySlow
-                    enemy.applySlow(baseEffect.duration);
-                }
+                let duration = baseEffect.duration * (1 - res);
+                if (duration > 0) enemy.applySlow(duration);
             }
         }
     }
