@@ -1,7 +1,7 @@
 # Arcane Glyphs — Games on Web 2025
 
 **Équipe :** Cazacu Ion, Virgile Lassagne, Sofiane
-
+**Vidéo Explicative:** https://www.youtube.com/watch?v=GPQWP5VItwQ
 ---
 
 ## Le thème : L'IA
