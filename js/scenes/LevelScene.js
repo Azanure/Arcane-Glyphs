@@ -75,13 +75,7 @@ export class LevelScene {
         this.spellManager = new SpellManager(this.scene);
         this.waveManager  = new WaveManager(this.scene);
 
-        // Charger le modèle du personnage sélectionné
-        await this._loadPlayerCharacter();
-
-        // Charger le modèle des ennemis
-        await this._loadEnemies();
-
-        // --- Global Resistances Init ---
+        // --- Global Resistances Init (pas de réseau, instantané) ---
         window.globalResistances = {};
         if (window.ElementDatabase) {
             Object.keys(window.ElementDatabase).forEach(el => {
@@ -90,24 +84,29 @@ export class LevelScene {
         }
         window.updateResistanceUI = () => { this._updateAIDirectorUI(); };
 
-        // Créer le joueur AVANT l'environnement (ensureSafeSpawn a besoin de window.player)
+        // Charger personnages + ennemis + monde EN PARALLÈLE
+        const env = new Environment(this.scene);
+        this.environment = env;
+        await Promise.all([
+            this._loadPlayerCharacter(),
+            this._loadEnemies(),
+            env.init(),
+        ]);
+
+        // Créer le joueur (nécessite les templates chargés ci-dessus)
         this.player = new Player(this.scene, this.sharedState);
         this.cameraManager = new CameraManager(this.scene);
         this.cameraManager.setTarget(this.player.mesh);
 
-        // Globals requis avant l'init de l'environnement
+        // Globals requis
         window.player         = this.player;
         window.isGamePaused   = false;
         window.gameTime       = 0;
-        window.enemiesEnabled = true; 
+        window.enemiesEnabled = true;
         window.spellCooldowns = this.spellManager.cooldowns;
         window.activeSpellIds = [];
 
-        // Environnement (charge lava_world.glb + ensureSafeSpawn)
-        this.environment = new Environment(this.scene);
-        await this.environment.init();
-
-        // Pré-générer les chunks autour du point de spawn AVANT le démarrage de la boucle.
+        // Pré-générer les chunks autour du point de spawn
         this.environment.update(this.player.mesh.position);
 
         // Reste des globals et DOM
@@ -129,18 +128,18 @@ export class LevelScene {
         let charData = {};
         
         try {
-            const res = await BABYLON.SceneLoader.ImportMeshAsync('', baseUrl, `${name}.glb`, this.scene);
+            // Charge le modèle principal + idle + running en PARALLÈLE
+            const [res, idleContainer, runContainer] = await Promise.all([
+                BABYLON.SceneLoader.ImportMeshAsync('', baseUrl, `${name}.glb`, this.scene),
+                BABYLON.SceneLoader.LoadAssetContainerAsync("", baseUrl + "idle.glb", this.scene).catch(() => null),
+                BABYLON.SceneLoader.LoadAssetContainerAsync("", baseUrl + "running.glb", this.scene).catch(() => null),
+            ]);
+
             res.meshes[0].setEnabled(false);
             charData.mesh = res.meshes[0];
             charData.animationGroups = res.animationGroups;
-            
-            try {
-                charData.idleContainer = await BABYLON.SceneLoader.LoadAssetContainerAsync("", baseUrl + "idle.glb", this.scene);
-            } catch(e) {}
-            
-            try {
-                charData.runContainer = await BABYLON.SceneLoader.LoadAssetContainerAsync("", baseUrl + "running.glb", this.scene);
-            } catch(e) {}
+            if (idleContainer) charData.idleContainer = idleContainer;
+            if (runContainer) charData.runContainer = runContainer;
             
             return charData;
         } catch (err) {
@@ -153,13 +152,14 @@ export class LevelScene {
         const name = this.sharedState.selectedCharacterName || 'brand';
         window.characterTemplates = {};
         
-        const mainChar = await this._loadCharacter(name);
-        if (mainChar) window.characterTemplates[name] = mainChar;
-        
-        if (name !== 'brand') {
-            const fallbackChar = await this._loadCharacter('brand');
-            if (fallbackChar) window.characterTemplates['brand'] = fallbackChar;
-        }
+        // Si on a besoin du perso principal + fallback brand, les charger en PARALLÈLE
+        const charsToLoad = [name];
+        if (name !== 'brand') charsToLoad.push('brand');
+
+        const results = await Promise.all(charsToLoad.map(n => this._loadCharacter(n)));
+        charsToLoad.forEach((n, i) => {
+            if (results[i]) window.characterTemplates[n] = results[i];
+        });
     }
 
     async _loadEnemies() {
